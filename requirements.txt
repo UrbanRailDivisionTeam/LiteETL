@@ -2,6 +2,8 @@ fastapi
 uvicorn[standard]
 
 pandas 
+polars[all]
+connectorx
 numpy
 colorlog
 toml
@@ -15,4 +17,3 @@ cx_oracle
 pymongo
 clickhouse-connect
 clickhouse-sqlalchemy
-
