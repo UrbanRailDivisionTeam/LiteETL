@@ -1,7 +1,7 @@
 import os
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from tasks.base import task
+from tasks.base import task, sync, sync_data
 from utils.logger import make_logger
 
 class scheduler:
@@ -28,15 +28,11 @@ class scheduler:
                 return False
         return True
         
-    def stop(self):
+    def stop(self) -> None:
         self.tpool.shutdown(wait=False, cancel_futures=True)
     
-    def task_init(self):
-        '''
-        用于生成任务和定义任务之间的依赖关系
-        返回值是需要最开始运行的任务列表
-        '''
-        ...
-        self.log.info("任务初始化已完成")
+    def task_init(self, input_tasks: list[task]) -> 'scheduler':
+        self.tasks = input_tasks
+        return self
             
 SCHEDULER = scheduler()

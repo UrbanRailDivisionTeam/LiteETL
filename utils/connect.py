@@ -42,7 +42,7 @@ class connecter:
             raise ValueError("不存在对应的连接")
         return self._connect[key].connect()
 
-    def close_all(self):
+    def close_all(self) -> None:
         """关闭所有数据库连接"""
         for engine in self._connect.values():
             engine.dispose()
