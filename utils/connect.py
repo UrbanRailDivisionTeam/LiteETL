@@ -49,10 +49,3 @@ class connecter:
 
 
 CONNECTER = connecter()
-
-logger_name = "mongo服务"
-CLIENT = MongoClient(
-        f"mongodb://{CONFIG.CONNECT[logger_name].user}:{quote_plus(CONFIG.CONNECT[logger_name].password)}@{CONFIG.CONNECT[logger_name].ip}:{str(CONFIG.CONNECT[logger_name].port)}"
-    ) if CONFIG.CONNECT[logger_name].user != "" else MongoClient(
-        host=[f"{CONFIG.CONNECT[logger_name].ip}:{str(CONFIG.CONNECT[logger_name].port)}"]    
-    )

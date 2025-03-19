@@ -1,7 +1,7 @@
 import os
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
-from tasks.base import task, sync, sync_data
+from tasks.base import task
 from utils.logger import make_logger
 
 class scheduler:

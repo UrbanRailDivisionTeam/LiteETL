@@ -3,17 +3,11 @@ uvicorn[standard]
 
 pandas 
 polars[all]
-connectorx
 numpy
 colorlog
-toml
-
-sqlglot[rs]
-peewee
 
 pyodbc
 mysqlclient
 cx_oracle
-pymongo
 clickhouse-connect
 clickhouse-sqlalchemy
