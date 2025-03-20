@@ -1,24 +1,25 @@
-import signal
-import sys
 import uvicorn
-from utils.config import CONFIG
-from utils.connect import CONNECTER
-from utils.scheduler import SCHEDULER
-from web.back.app import app
-from tasks import task_init, task_run
+import multiprocessing as mp
 
-def signal_handler(signum, frame):
-    print("正在关闭连接...")
-    # 关闭所有数据库连接
-    SCHEDULER.stop()
-    CONNECTER.close_all()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
-if __name__ == "__main__":
-    # task_run(task_init())
-    # uvicorn.run(app=app, host=CONFIG.BACK_HOST, port=CONFIG.BACK_PORT, reload=True)
-    task_init()
+def process_etl() -> None:
+    from tasks.scheduler import SCHEDULER
+    from tasks.init import task_init
+    SCHEDULER.append(task_init())
     
+def process_web() -> None:
+    from web.back.app import app
+    uvicorn.run(app=app, host="0.0.0.0", port=5001, reload=True)
+
+# if __name__ == "__main__":
+#     p_etl = mp.Process(target=process_etl)
+#     p_web = mp.Process(target=process_web)
+#     process_list = [p_etl, p_web]
+    
+#     for ch in process_list:
+#         ch.start()
+        
+#     for ch in process_list:
+#         ch.join()
+        
+if __name__ == "__main__":
+    process_etl()

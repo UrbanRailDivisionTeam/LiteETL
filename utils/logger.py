@@ -1,6 +1,6 @@
 import logging
 import colorlog
-from utils.connect import CONNECTER
+from utils.connect import DUCKDB
 
 class duckdb_handler(logging.Handler):
     """将日志写到本地duckDB数据库的自定义handler"""
@@ -8,32 +8,30 @@ class duckdb_handler(logging.Handler):
     def __init__(self, name: str) -> None:
         logging.Handler.__init__(self)
         self.name = name
-        self.cursor = CONNECTER.get_logger()
+        self.cursor = DUCKDB.cursor()
+        self.cursor.execute("CREATE SCHEMA IF NOT EXISTS logger")
         # 指定创建时间为默认时间戳，id自动生成
         self.cursor.execute(
             f'''
-            CREATE TABLE IF NOT EXISTS "{self.name}" (
-                {self.columns[0]} TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
-                {self.columns[1]} VARCHAR, 
-                {self.columns[2]} VARCHAR
+            CREATE TABLE IF NOT EXISTS logger.{self.name} (
+                log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, 
+                level VARCHAR, 
+                msg VARCHAR
             )
             '''
         )
-        
-    def __del__(self):
-        self.cursor.close()
 
     def emit(self, record) -> None:
         try:
             temp_msg = self.format(record).split(":")
             level = temp_msg[0]
             msg = ":".join(temp_msg[1:])
-            self.cursor.execute(f"INSERT INTO \"{self.name}\" ({self.columns[1]}, {self.columns[2]}) VALUES (?, ?)", [level, msg])
+            self.cursor.execute(f"INSERT INTO logger.{self.name} (level, msg) VALUES (?, ?)", [level, msg])
         except Exception:
             self.handleError(record)
 
 
-def make_logger(logger_name: str)-> logging.Logger:
+def make_logger(logger_name: str, table_name: str)-> logging.Logger:
     """生成日志的工厂方法"""
     temp_log = logging.getLogger(logger_name)
     temp_log.setLevel(logging.DEBUG)
@@ -52,7 +50,7 @@ def make_logger(logger_name: str)-> logging.Logger:
             datefmt='## %Y-%m-%d %H:%M:%S'
         ))
     temp_log.addHandler(console)
-    mongoio = duckdb_handler(logger_name)
+    mongoio = duckdb_handler(table_name)
     mongoio.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(levelname)s:%(message)s')
     mongoio.setFormatter(formatter)

@@ -3,13 +3,12 @@ uvicorn[standard]
 pandas 
 numpy
 colorlog
-toml
-sqlalchemy[asyncio]
-sqlglot[rs]
+
+sqlalchemy
+
 pyodbc
 mysqlclient
 cx_oracle
 pymongo
-clickhouse-connect
-clickhouse-sqlalchemy
+
 duckdb
