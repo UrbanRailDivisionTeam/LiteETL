@@ -2,12 +2,13 @@ fastapi
 uvicorn[standard]
 
 pandas 
-polars[all]
 numpy
 colorlog
 
+duckdb
+
 pyodbc
+psycopg2
 mysqlclient
 cx_oracle
 clickhouse-connect
-clickhouse-sqlalchemy
