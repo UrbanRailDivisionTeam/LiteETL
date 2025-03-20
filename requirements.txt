@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+
 pandas 
 numpy
 colorlog
@@ -7,6 +8,7 @@ colorlog
 sqlalchemy
 
 pyodbc
+psycopg2
 mysqlclient
 cx_oracle
 pymongo

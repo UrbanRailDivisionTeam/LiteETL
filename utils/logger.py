@@ -2,9 +2,7 @@ import logging
 import colorlog
 from utils.connect import DUCKDB
 
-class duckdb_handler(logging.Handler):
-    """将日志写到本地duckDB数据库的自定义handler"""
-    columns = ["log_time", "level", "msg"]
+class self_handler(logging.Handler):
     def __init__(self, name: str) -> None:
         logging.Handler.__init__(self)
         self.name = name
@@ -23,7 +21,8 @@ class duckdb_handler(logging.Handler):
 
     def emit(self, record) -> None:
         try:
-            temp_msg = self.format(record).split(":")
+            msg = self.format(record)
+            temp_msg = msg.split(":")
             level = temp_msg[0]
             msg = ":".join(temp_msg[1:])
             self.cursor.execute(f"INSERT INTO logger.{self.name} (level, msg) VALUES (?, ?)", [level, msg])
@@ -56,5 +55,3 @@ def make_logger(logger_name: str, table_name: str)-> logging.Logger:
     mongoio.setFormatter(formatter)
     temp_log.addHandler(mongoio)
     return temp_log
-            
-        

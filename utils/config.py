@@ -13,8 +13,23 @@ class connect_config:
 
 
 @dataclass
+
+@dataclass
+class connect_config:
+    dbtype: str
+    ip: str
+    port: int
+    user: str
+    password: str
+    database: str
+
+
+@dataclass
 class config:
     """全局所有的配置"""
+    # 所有的数据源连接配置
+    CONNECT: dict[str, connect_config]
+    CK_CONNECT: connect_config
     # 所有的数据源连接配置
     CONNECT: dict[str, connect_config]
     CK_CONNECT: connect_config
