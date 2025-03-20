@@ -2,7 +2,7 @@ import logging
 import colorlog
 from utils.connect import DUCKDB
 
-class self_handler(logging.Handler):
+class duckdb_handler(logging.Handler):
     def __init__(self, name: str) -> None:
         logging.Handler.__init__(self)
         self.name = name

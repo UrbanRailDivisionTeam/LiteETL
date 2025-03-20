@@ -1,11 +1,11 @@
 import polars as pl
 from tasks.base import task
-from utils.connect import CONNECTER
+from utils.connect import DUCKDB
 
 class ameliorate(task):
     def __init__(self) -> None:
         super().__init__("改善数据处理", "ameliorate")
-        self.connect = CONNECTER.get("clickhouse服务")
+        self.connect = DUCKDB.cursor()
         
     def task_main(self) -> None:
         temp_select = f"SELECT * FROM ods."

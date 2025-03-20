@@ -1,19 +1,6 @@
 import os
 from dataclasses import dataclass
 
-
-@dataclass
-class connect_config:
-    dbtype: str
-    ip: str
-    port: int
-    user: str
-    password: str
-    database: str
-
-
-@dataclass
-
 @dataclass
 class connect_config:
     dbtype: str

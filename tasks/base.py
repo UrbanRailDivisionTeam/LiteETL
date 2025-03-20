@@ -1,16 +1,9 @@
 import time
-import datetime
 import traceback
-import datetime
 import traceback
-import sqlalchemy
-import clickhouse_connect.driver.client
-import pandas as pd
 import polars as pl
 from dataclasses import dataclass
 from sqlalchemy import text
-import clickhouse_connect.driver.client
-import pandas as pd
 import polars as pl
 from dataclasses import dataclass
 from sqlalchemy import text
@@ -22,11 +15,7 @@ from utils.connect import CONNECT, DUCKDB
 from utils.logger import make_logger
 
 
-
 class task(ABC):
-    '''所有任务的抽象'''
-
-    def __init__(self, name: str, logger_name: str) -> None:
     '''所有任务的抽象'''
 
     def __init__(self, name: str, logger_name: str) -> None:
@@ -43,12 +32,10 @@ class task(ABC):
         self.next.append(input_task)
         return self
 
-
-    # 继承后实现逻辑的地方
     @abstractmethod
     def task_main(self) -> None:
+        # 继承后实现逻辑的地方
         ...
-
 
     def run(self) -> None:
         # 真正运行函数的地方
@@ -93,6 +80,7 @@ class sync(task):
         self.source.close()
         self.target.close()
 
+
 @dataclass
 class increase_data:
     name: str
@@ -104,6 +92,7 @@ class increase_data:
     source_entry_sync_sql: dict[str, dict]
     taget_table: str
     taget_increase_sql: str
+
 
 class increase(task):
     def __init__(self, data: increase_data) -> None:
@@ -146,6 +135,6 @@ class increase(task):
             in_clause = ", ".join(map(str, ids_to_select))
             select_statement = text(f"SELECT * FROM {self.data.source_sync_sql} AS subquery WHERE subquery.id in ({in_clause})")
             increase_df = pl.read_database(select_statement, self.source)
-            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append") # 这里一定能添加成功，因为重复的行数已经删除了
+            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
 
         self.log.debug("已成功完成该表的增量同步")
