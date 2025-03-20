@@ -1,6 +1,6 @@
 import os
 from utils.config import CONFIG
-from tasks.base import task, sync, sync_data
+from tasks.base import task, sync, increase, extract_data
 
 
 def read_sql(sql_path: str) -> str:
@@ -20,7 +20,7 @@ def task_init() -> list[task]:
     tasks_group = []
     tasks_group.append(
         sync(
-            sync_data(
+            extract_data(
                 name="业联执行关闭",
                 logger_name="business_connection_close",
                 source="mysql服务",

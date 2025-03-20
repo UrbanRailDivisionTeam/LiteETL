@@ -1,4 +1,3 @@
-import polars as pl
 from tasks.base import task
 from utils.connect import DUCKDB
 
@@ -8,8 +7,7 @@ class ameliorate(task):
         self.connect = DUCKDB.cursor()
         
     def task_main(self) -> None:
-        temp_select = f"SELECT * FROM ods."
-        source_data = pl.read_database(temp_select, self.connect, batch_size=10000)
+        self.connect.sql("SELECT * FROM ods.ameliorate").fetchall()
         
         
     def __del__(self)-> None:
