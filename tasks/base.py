@@ -97,7 +97,7 @@ class extract(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
-        temp_df = pd.read_sql(self.data.source_sql, self.source, chunksize=CONFIG.MAX_INCREASE_CHANGE)
+        temp_df = pd.read_sql(self.data.source_sql, self.source)
         self.target.execute(f"CREATE OR REPLACE TABLE {self.data.taget_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
@@ -216,7 +216,7 @@ class extract_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        temp_df = pd.read_sql(self.data.source_sync_sql, self.source, chunksize=CONFIG.MAX_INCREASE_CHANGE)
+        temp_df = pd.read_sql(self.data.source_sync_sql, self.source)
         self.target.execute(f"CREATE OR REPLACE TABLE {self.data.taget_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
