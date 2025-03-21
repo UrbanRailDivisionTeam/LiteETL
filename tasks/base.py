@@ -1,6 +1,5 @@
 import time
 import traceback
-import polars as pl
 import pandas as pd
 from dataclasses import dataclass
 from sqlalchemy import text
@@ -119,13 +118,26 @@ class sync(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
-        temp_df = pl.read_database(self.data.source_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        index = temp_df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
+        temp_df = pd.read_sql(self.data.source_sql, self.source)
+        index = temp_df.to_sql(self.data.taget_table, self.target, if_exists="replace")
         self.log.debug(f"全量同步已完成，变更{str(index)}行")
 
     def __del__(self) -> None:
         self.source.close()
         self.target.close()
+        
+        
+        
+        
+def get_diff(source_increase_df: pd.DataFrame, taget_increase_df: pd.DataFrame) -> tuple[list, list, list]:
+    '''获取两个dataframe的不同'''
+    new_diff = source_increase_df[~source_increase_df['id'].isin(taget_increase_df['id'])]['id'].tolist()
+    del_diff = taget_increase_df[~taget_increase_df['id'].isin(source_increase_df['id'])]['id'].tolist()
+    common_ids = pd.merge(source_increase_df, taget_increase_df, on='id', how='inner', suffixes=('_a', '_b'))
+    columns_to_check = [col for col in source_increase_df.columns if col != 'id']
+    common_ids['is_diff'] = common_ids.apply(lambda row: any(row[f'{col}_a'] != row[f'{col}_b'] for col in columns_to_check), axis=1)
+    change_diff = common_ids[common_ids['is_diff']]['id'].tolist()
+    return new_diff, del_diff, change_diff
 
 
 @dataclass
@@ -149,40 +161,31 @@ class load_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        df = pl.from_dataframe(self.source.sql(self.data.source_sync_sql).fetchdf())
-        index = df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
+        df: pd.DataFrame = self.source.sql(self.data.source_sync_sql).fetchdf()
+        index = df.to_sql(self.data.taget_table, self.target, if_exists="replace")
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
 
-    def trans_increase(self, new_diff: pl.DataFrame, del_diff: pl.DataFrame, change_diff: pl.DataFrame) -> None:
-        if del_diff.height + change_diff.height > 0:
-            ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
+    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+        if len(del_diff) + len(change_diff) > 0:
+            ids_to_delete = del_diff + change_diff
             delete_statement = text(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join(map(str, ids_to_delete))})")
             self.target.execute(delete_statement)
             self.target.commit()
 
-        if new_diff.height + change_diff.height > 0:
-            ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
+        if len(new_diff) + len(change_diff) > 0:
+            ids_to_select = new_diff + change_diff
             in_clause = ", ".join(map(str, ids_to_select))
-            increase_df = pl.from_dataframe(self.source.sql(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})").fetchdf())
-            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")
+            increase_df: pd.DataFrame = self.source.sql(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})").fetchdf()
+            increase_df.to_sql(self.data.taget_table, self.target, if_exists="append")
 
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
-        source_increase_df = pl.from_dataframe(self.source.sql(self.data.source_increase_sql).fetchdf())
-        taget_increase_df = pl.read_database(self.data.taget_increase_sql, self.target, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-
-        new_diff = source_increase_df.join(taget_increase_df, left_on="id")
-        del_diff = taget_increase_df.join(source_increase_df, left_on="id")
-        if source_increase_df.width != 1:
-            change_diff = source_increase_df.join(taget_increase_df, on="id", how="inner").filter(
-                pl.any_horizontal(pl.col(source_increase_df.columns[1:]) != pl.col(taget_increase_df.columns[1:]))
-            ).select("id")
-        else:
-            change_diff = pl.DataFrame()
-
+        source_increase_df: pd.DataFrame = self.source.sql(self.data.source_increase_sql).fetchdf()
+        taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
-        change_len = new_diff.height + change_diff.height
+        change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             self.trans_sync()
@@ -215,35 +218,26 @@ class extract_increase(task):
         self.target.execute(f"CREATE OR REPLACE TABLE {self.data.taget_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
-    def trans_increase(self, new_diff: pl.DataFrame, del_diff: pl.DataFrame, change_diff: pl.DataFrame) -> None:
-        if del_diff.height + change_diff.height > 0:
-            ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
+    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+        if len(del_diff) + len(change_diff) > 0:
+            ids_to_delete = del_diff + change_diff
             self.target.execute(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join(map(str, ids_to_delete))})")
 
-        if new_diff.height + change_diff.height > 0:
-            ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
+        if len(new_diff) + len(change_diff) > 0:
+            ids_to_select = new_diff + change_diff
             in_clause = ", ".join(map(str, ids_to_select))
             select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
-            increase_df = pl.read_database(select_statement, self.source).to_pandas()
+            increase_df = pd.read_sql(select_statement, self.source)
             self.target.execute(f"INSERT INTO {self.data.taget_table} SELECT * FROM increase_df")
 
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
-        source_increase_df = pl.read_database(self.data.source_increase_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        taget_increase_df = pl.from_dataframe(self.target.sql(self.data.taget_increase_sql).fetchdf())
-
-        new_diff = source_increase_df.join(taget_increase_df, left_on="id")
-        del_diff = taget_increase_df.join(source_increase_df, left_on="id")
-        if source_increase_df.width != 1:
-            change_diff = source_increase_df.join(taget_increase_df, on="id", how="inner").filter(
-                pl.any_horizontal(pl.col(source_increase_df.columns[1:]) != pl.col(taget_increase_df.columns[1:]))
-            ).select("id")
-        else:
-            change_diff = pl.DataFrame()
-
+        source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
+        taget_increase_df = self.target.sql(self.data.taget_increase_sql).fetchdf()
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
-        change_len = new_diff.height + change_diff.height
+        change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             self.trans_sync()
@@ -272,41 +266,31 @@ class sync_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        df = pl.read_database(self.data.source_sync_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        index = df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
+        df = pd.read_sql(self.data.source_sync_sql, self.source)
+        index = df.to_sql(self.data.taget_table, self.target, if_exists="replace")
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
 
-    def trans_increase(self, new_diff: pl.DataFrame, del_diff: pl.DataFrame, change_diff: pl.DataFrame) -> None:
-        if del_diff.height + change_diff.height > 0:
-            ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
+    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+        if len(del_diff) + len(change_diff) > 0:
+            ids_to_delete = del_diff + change_diff
             delete_statement = text(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join(map(str, ids_to_delete))})")
             self.target.execute(delete_statement)
             self.target.commit()
 
-        if new_diff.height + change_diff.height > 0:
-            ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
+        if len(new_diff) + len(change_diff) > 0:
+            ids_to_select = new_diff + change_diff
             in_clause = ", ".join(map(str, ids_to_select))
             select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
-            increase_df = pl.read_database(select_statement, self.source)
-            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
+            pd.read_sql(select_statement, self.source).to_sql(self.data.taget_table, self.target, if_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
 
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
-        source_increase_df = pl.read_database(self.data.source_increase_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        taget_increase_df = pl.read_database(self.data.taget_increase_sql, self.target, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-
-        new_diff = source_increase_df.join(taget_increase_df, left_on="id")
-        del_diff = taget_increase_df.join(source_increase_df, left_on="id")
-        if source_increase_df.width != 1:
-            change_diff = source_increase_df.join(taget_increase_df, on="id", how="inner").filter(
-                pl.any_horizontal(pl.col(source_increase_df.columns[1:]) != pl.col(taget_increase_df.columns[1:]))
-            ).select("id")
-        else:
-            change_diff = pl.DataFrame()
-
+        source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
+        taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
-        change_len = new_diff.height + change_diff.height
+        change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             self.trans_sync()
