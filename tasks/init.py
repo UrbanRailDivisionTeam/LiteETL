@@ -1,6 +1,6 @@
 import os
 from utils.config import CONFIG
-from tasks.base import task, sync, increase, extract_data
+from tasks.base import extract, extract_data, task, sync, sync_data
 
 
 def read_sql(sql_path: str) -> str:
@@ -19,7 +19,7 @@ def task_init() -> list[task]:
     '''任务真真正进行初始化，并添加依赖关系的地方'''
     tasks_group = []
     tasks_group.append(
-        sync(
+        extract(
             extract_data(
                 name="业联执行关闭",
                 logger_name="business_connection_close",
