@@ -21,7 +21,7 @@ def task_init() -> list[task]:
     tasks_group.append(
         extract_increase(
             extract_increase_data(
-                name="业联执行关闭",
+                name="车间联络单",
                 logger_name="business_connection",
                 source="mysql服务",
                 source_sync_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
