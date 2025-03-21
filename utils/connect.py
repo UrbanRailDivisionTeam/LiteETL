@@ -9,8 +9,6 @@ class external_connecter:
     def __init__(self) -> None:
         self._connect: dict[str, sqlalchemy.Engine] = {}
         self.make_client(CONFIG.CONNECT)
-        self._connect: dict[str, sqlalchemy.Engine] = {}
-        self.make_client(CONFIG.CONNECT)
 
     def make_client(self, connect_config: dict[str, connect_config]) -> None:
         """

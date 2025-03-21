@@ -21,10 +21,6 @@ class task(ABC):
         self.log = make_logger(name, logger_name)
         self.next: list[task] = []
 
-        self.is_run = False
-        self.log = make_logger(name, logger_name)
-        self.next: list[task] = []
-
     def then(self, input_task: 'task') -> 'task':
         self.next.append(input_task)
         return self
@@ -43,7 +39,6 @@ class task(ABC):
             self.log.critical("报错内容：" + str(e))
             self.log.critical("报错堆栈信息：" + str(traceback.format_exc()))
         end_time = time.time()
-        self.log.info("函数花费时间为:{} 秒".format(end_time - start_time))
         self.log.info("函数花费时间为:{} 秒".format(end_time - start_time))
         # 如果存在对应的依赖任务，则添加到调度器中
         SCHEDULER.append(self.next)
