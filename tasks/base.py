@@ -1,3 +1,4 @@
+from re import L
 import time
 import traceback
 import polars as pl
@@ -93,7 +94,9 @@ class sync(task):
             self.source = DUCKDB.cursor()
             self.source.execute("CREATE SCHEMA IF NOT EXISTS dm")
             self.source.execute("USE dm")
-            self.source = CONNECT[data.target]
+            self.target = CONNECT[data.target]
+        else:
+            raise ValueError("任务类型不正确，不生成对应的级联任务")
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
@@ -112,8 +115,6 @@ class load_increase_data:
     logger_name: str
     source_sync_sql: str
     source_increase_sql: str
-    # 级联更新，人工定义表的外键
-    source_entry_sync: list[dict]
     taget_table: str
     taget_increase_sql: str
     target: str
@@ -125,7 +126,6 @@ class extract_increase_data:
     logger_name: str
     source_sync_sql: str
     source_increase_sql: str
-    source_entry_sync: list[dict]
     taget_table: str
     taget_increase_sql: str
     source: str
@@ -137,7 +137,6 @@ class sync_increase_data:
     logger_name: str
     source_sync_sql: str
     source_increase_sql: str
-    source_entry_sync: list[dict]
     taget_table: str
     taget_increase_sql: str
     source: str
@@ -148,20 +147,43 @@ class increase(task):
     def __init__(self, data: load_increase_data | extract_increase_data | sync_increase_data) -> None:
         super().__init__(data.name, data.logger_name)
         self.data = data
-        if isinstance(data, sync_data):
+        if isinstance(data, sync_increase_data):
             self.source = CONNECT[data.source]
             self.target = CONNECT[data.target]
-        elif isinstance(data, extract_data):
+        elif isinstance(data, extract_increase_data):
             self.source = CONNECT[data.source]
             self.target = DUCKDB.cursor()
             self.target.execute("CREATE SCHEMA IF NOT EXISTS ods")
             self.target.execute("USE ods")
-        elif isinstance(data, load_data):
+        elif isinstance(data, load_increase_data):
             self.source = DUCKDB.cursor()
             self.source.execute("CREATE SCHEMA IF NOT EXISTS dm")
             self.source.execute("USE dm")
-            self.source = CONNECT[data.target]
+            self.target = CONNECT[data.target]
+        else:
+            raise ValueError("任务类型不正确，不生成对应的级联任务")
         self.log.info(f"任务{self.data.name}初始化完成")
+
+    def trans_sync(self) -> None:
+        df = pl.read_database(self.data.source_sync_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
+        index = df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
+        self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
+
+    def trans_increase(self, new_diff: pl.DataFrame, del_diff: pl.DataFrame, change_diff: pl.DataFrame) -> None:
+        if del_diff.height + change_diff.height > 0:
+            ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
+            delete_statement = text(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join(map(str, ids_to_delete))})")
+            self.target.execute(delete_statement)
+            self.target.commit()
+
+        if new_diff.height + change_diff.height > 0:
+            ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
+            in_clause = ", ".join(map(str, ids_to_select))
+            select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
+            increase_df = pl.read_database(select_statement, self.source)
+            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
+
+        self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
         source_increase_df = pl.read_database(self.data.source_increase_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
@@ -180,195 +202,6 @@ class increase(task):
         change_len = new_diff.height + change_diff.height
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
-            df = pl.read_database(self.data.source_sync_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-            index = df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
-            self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
-            for entry in self.data.source_entry_sync:
-                if entry["type"] == "load":
-                    self.then(
-                        sync(
-                            load_data(
-                                name=self.data.name + "_entry",
-                                logger_name=self.data.logger_name + "_entry",
-                                source_sql=entry["sql"],
-                                taget_table=
-                            )
-                        )
-                    )
-                elif entry["type"] == "extract":
-                    ...
-                elif entry["type"] == "sync":
-                    ...
-                else:
-                    raise ValueError("任务类型不正确，不生成对应的级联任务")
-            return
-
-        if del_diff.height + change_diff.height > 0:
-            ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
-            delete_statement = text(f"DELETE FROM your_table WHERE id IN ({','.join(map(str, ids_to_delete))})")
-            self.target.execute(delete_statement)
-            self.target.commit()
-
-        if new_diff.height + change_diff.height > 0:
-            ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
-            in_clause = ", ".join(map(str, ids_to_select))
-            select_statement = text(f"SELECT * FROM {self.data.source_sync_sql} AS subquery WHERE subquery.id in ({in_clause})")
-            increase_df = pl.read_database(select_statement, self.source)
-            increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
-
-        self.log.debug("已成功完成该主表的增量同步")
-
-        for entry in self.data.source_entry_sync:
-            if entry["type"] == "load":
-                self.then(
-                    increase_entry(
-                        load_increase_entry_data(
-                            name=self.data.name + "_entry",
-                            logger_name=self.data.logger_name + "_entry",
-                            source_sync_sql=entry["sql"],
-                            change_id=change_diff["id"].to_list(),
-                            new_id=new_diff["id"].to_list(),
-                            del_id=del_diff["id"].to_list(),
-                            source_entry_sync_sql=entry["entry"],
-                            taget_table=entry["taget_table"],
-                            target=entry["target"]
-                        )
-                    )
-                )
-            elif entry["type"] == "extract":
-                self.then(
-                    increase_entry(
-                        extract_increase_entry_data(
-                            name=self.data.name + "_entry",
-                            logger_name=self.data.logger_name + "_entry",
-                            source_sync_sql=entry["sql"],
-                            change_id=change_diff["id"].to_list(),
-                            new_id=new_diff["id"].to_list(),
-                            del_id=del_diff["id"].to_list(),
-                            source_entry_sync_sql=entry["entry"],
-                            taget_table=entry["taget_table"],
-                            source=entry["source"]
-                        )
-                    )
-                )
-            elif entry["type"] == "sync":
-                self.then(
-                    increase_entry(
-                        sync_increase_entry_data(
-                            name=self.data.name + "_entry",
-                            logger_name=self.data.logger_name + "_entry",
-                            source_sync_sql=entry["sql"],
-                            change_id=change_diff["id"].to_list(),
-                            new_id=new_diff["id"].to_list(),
-                            del_id=del_diff["id"].to_list(),
-                            source_entry_sync_sql=entry["entry"],
-                            taget_table=entry["taget_table"],
-                            target=entry["target"],
-                            source=entry["source"]
-                        )
-                    )
-                )
-            else:
-                raise ValueError("任务类型不正确，不生成对应的级联任务")
-
-        self.log.debug("已成功级联任务的生成")
-
-
-@dataclass
-class load_increase_entry_data:
-    name: str
-    logger_name: str
-    source_sync_sql: str
-    change_id: list
-    new_id: list
-    del_id: list
-    source_entry_sync_sql: dict
-    taget_table: str
-    target: str
-
-
-@dataclass
-class extract_increase_entry_data:
-    name: str
-    logger_name: str
-    source_sync_sql: str
-    change_id: list
-    new_id: list
-    del_id: list
-    source_entry_sync_sql: dict
-    taget_table: str
-    source: str
-
-
-@dataclass
-class sync_increase_entry_data:
-    name: str
-    logger_name: str
-    source_sync_sql: str
-    change_id: list
-    new_id: list
-    del_id: list
-    source_entry_sync_sql: dict
-    taget_table: str
-    source: str
-    target: str
-
-
-class increase_entry(task):
-    def __init__(self, data: load_increase_entry_data | extract_increase_entry_data | sync_increase_entry_data) -> None:
-        super().__init__(data.name, data.logger_name)
-        self.data = data
-        if isinstance(data, sync_data):
-            self.source = CONNECT[data.source]
-            self.target = CONNECT[data.target]
-        elif isinstance(data, extract_data):
-            self.source = CONNECT[data.source]
-            self.target = DUCKDB.cursor()
-            self.target.execute("CREATE SCHEMA IF NOT EXISTS ods")
-            self.target.execute("USE ods")
-        elif isinstance(data, load_data):
-            self.source = DUCKDB.cursor()
-            self.source.execute("CREATE SCHEMA IF NOT EXISTS dm")
-            self.source.execute("USE dm")
-            self.source = CONNECT[data.target]
-        self.log.info(f"任务{self.data.name}初始化完成")
-        
-    def task_main(self) -> None:
-        ...
-
-    # def task_main(self) -> None:
-        # source_increase_df = pl.read_database(self.data.source_increase_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        # taget_increase_df = pl.read_database(self.data.taget_increase_sql, self.target, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-
-        # new_diff = source_increase_df.join(taget_increase_df, left_on="id")
-        # del_diff = taget_increase_df.join(source_increase_df, left_on="id")
-        # if source_increase_df.width != 1:
-        #     change_diff = source_increase_df.join(taget_increase_df, on="id", how="inner").filter(
-        #         pl.any_horizontal(pl.col(source_increase_df.columns[1:]) != pl.col(taget_increase_df.columns[1:]))
-        #     ).select("id")
-        # else:
-        #     change_diff = pl.DataFrame()
-
-        # # 如果超过要求大小，退化为全量同步
-        # change_len = new_diff.height + change_diff.height
-        # if change_len > CONFIG.MAX_INCREASE_CHANGE:
-        #     self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
-        #     df = pl.read_database(self.data.source_sync_sql, self.source, batch_size=CONFIG.MAX_INCREASE_CHANGE)
-        #     index = df.write_database(self.data.taget_table, self.target, if_table_exists="replace")
-        #     self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
-        #     return
-
-        # if del_diff.height + change_diff.height > 0:
-        #     ids_to_delete = del_diff["id"].to_list() + change_diff["id"].to_list()
-        #     delete_statement = text(f"DELETE FROM your_table WHERE id IN ({','.join(map(str, ids_to_delete))})")
-        #     self.target.execute(delete_statement)
-        #     self.target.commit()
-
-        # if new_diff.height + change_diff.height > 0:
-        #     ids_to_select = new_diff["id"].to_list() + change_diff["id"].to_list()
-        #     in_clause = ", ".join(map(str, ids_to_select))
-        #     select_statement = text(f"SELECT * FROM {self.data.source_sync_sql} AS subquery WHERE subquery.id in ({in_clause})")
-        #     increase_df = pl.read_database(select_statement, self.source)
-        #     increase_df.write_database(self.data.taget_table, self.target, if_table_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
-
-        # self.log.debug("已成功完成该表的增量同步")
+            self.trans_sync()
+        else:
+            self.trans_increase(new_diff, del_diff, change_diff)
