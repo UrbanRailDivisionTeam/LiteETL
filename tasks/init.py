@@ -1,6 +1,6 @@
 import os
 from utils.config import CONFIG
-from tasks.base import extract, extract_data, task, sync, sync_data
+from tasks.base import extract, extract_data, task, extract_increase, extract_increase_data
 
 
 def read_sql(sql_path: str) -> str:
@@ -19,13 +19,15 @@ def task_init() -> list[task]:
     '''任务真真正进行初始化，并添加依赖关系的地方'''
     tasks_group = []
     tasks_group.append(
-        extract(
-            extract_data(
+        extract_increase(
+            extract_increase_data(
                 name="业联执行关闭",
-                logger_name="business_connection_close",
+                logger_name="business_connection",
                 source="mysql服务",
-                source_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
-                taget_table="business_connection_close"
+                source_sync_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
+                source_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection.sql")),
+                taget_table="business_connection_close",
+                taget_increase_sql = read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection.sql")),
             )
         ))
     return tasks_group
