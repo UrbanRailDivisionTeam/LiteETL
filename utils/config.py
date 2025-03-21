@@ -21,7 +21,7 @@ class config:
     CONNECT: dict[str, connect_config]
     CK_CONNECT: connect_config
     # 资源文件对应的路径
-    SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "source")
     SELECT_PATH = os.path.join(SOURCE_PATH, "select")
     # 同步配置的间隔时长
     INTERVAL_DURATION: float = 5 * 60
