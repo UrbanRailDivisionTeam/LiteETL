@@ -4,7 +4,7 @@ from tasks.base import task, sync, increase, extract_data
 
 
 def read_sql(sql_path: str) -> str:
-    with open(os.path.abspath(os.path.join(CONFIG.SOURCE_PATH, sql_path)), mode="r", encoding="utf-8") as file:
+    with open(os.path.abspath(os.path.join(CONFIG.SELECT_PATH, sql_path)), mode="r", encoding="utf-8") as file:
         sql_str = file.read()
     return sql_str
 
