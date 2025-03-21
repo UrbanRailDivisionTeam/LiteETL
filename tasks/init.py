@@ -26,8 +26,18 @@ def task_init() -> list[task]:
                 source="mysql服务",
                 source_sync_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
                 source_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_source.sql")),
-                taget_table="business_connection_close",
+                taget_table="business_connection",
                 taget_increase_sql = read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_target.sql")),
             )
-        ))
+        )
+        # extract(
+        #     extract_data(
+        #         name="车间联络单",
+        #         logger_name="business_connection",
+        #         source="mysql服务",
+        #         source_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
+        #         taget_table="business_connection"
+        #     )
+        # )
+    )
     return tasks_group
