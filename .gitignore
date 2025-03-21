@@ -5,5 +5,5 @@ __pycache__/
 __pypackages__/
 
 .vscode
-source/database/*.db
-source/database/*.wal
+source/*.db
+source/*.wal
