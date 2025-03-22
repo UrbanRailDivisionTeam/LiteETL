@@ -9,7 +9,6 @@ class ameliorate(process):
     
     def task_main(self) -> None:
         data_index = pd.read_csv(os.path.join(CONFIG.TABLE_PATH, "城轨事业部改善指标.csv"), encoding="utf-8")
-        print()
         data: pd.DataFrame = self.connect.sql(
             f"""
                 SELECT 

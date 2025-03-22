@@ -291,7 +291,7 @@ class extract_increase(task):
 
     def trans_sync(self) -> None:
         temp_df = pd.read_sql(self.data.source_sync_sql, self.source)
-        self.target.execute(f"CREATE OR REPLACE TABLE {self.data.target_table} AS SELECT * FROM temp_df")
+        self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
     def task_main(self) -> None:
