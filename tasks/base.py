@@ -295,7 +295,7 @@ class extract_increase(task):
         self.log.debug(f"全量抽取已完成")
 
     def task_main(self) -> None:
-        temp = self.target.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'dm' AND table_name = '{self.data.target_table}'").fetchall()
+        temp = self.target.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'ods' AND table_name = '{self.data.target_table}'").fetchall()
         if len(temp) == 0:
             self.log.warning("本地未找到目标表，转换为全量同步")
             return self.trans_sync()
@@ -318,7 +318,7 @@ class extract_increase(task):
             select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
             increase_df = pd.read_sql(select_statement, self.source)
             try:
-                self.target.execute(f"INSERT INTO {self.data.target_table} SELECT * FROM increase_df")
+                self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM increase_df")
             except Exception as e:
                 self.log.warning(e)
                 self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
