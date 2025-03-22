@@ -16,13 +16,10 @@ class config:
     """全局所有的配置"""
     # 所有的数据源连接配置
     CONNECT: dict[str, connect_config]
-    CK_CONNECT: connect_config
-    # 所有的数据源连接配置
-    CONNECT: dict[str, connect_config]
-    CK_CONNECT: connect_config
     # 资源文件对应的路径
     SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "source")
     SELECT_PATH = os.path.join(SOURCE_PATH, "select")
+    TABLE_PATH = os.path.join(SOURCE_PATH, "table")
     # 同步配置的间隔时长
     INTERVAL_DURATION: float = 5 * 60
     # 增量同步变更量最大值，新增的行数和修改的行数之和超过这个数，增量同步就退化为全量同步
@@ -34,14 +31,6 @@ class config:
 debug = True
 if debug:
     CONFIG = config(
-        CK_CONNECT=connect_config(
-            dbtype="clickhouse",
-            ip="localhost",
-            port=8123,
-            user="cheakf",
-            password="Swq8855830.",
-            database="default"
-        ),
         CONNECT={
             "mysql服务": connect_config(
                 dbtype="mysql",
@@ -87,14 +76,6 @@ if debug:
     )
 else:
     CONFIG = config(
-        CK_CONNECT=connect_config(
-            dbtype="clickhouse",
-            ip="10.24.5.53",
-            port=8123,
-            user="cheakf",
-            password="Swq8855830.",
-            database="default"
-        ),
         CONNECT={
             "相关方数据库": connect_config(
                 dbtype="pgsql",

@@ -1,4 +1,5 @@
 import os
+import pymongo
 import duckdb
 import sqlalchemy
 from urllib.parse import quote_plus
@@ -48,3 +49,4 @@ class external_connecter:
 
 CONNECT = external_connecter()
 DUCKDB = duckdb.connect(os.path.realpath(os.path.join(CONFIG.SOURCE_PATH, "data.db")))
+MONGO = pymongo.MongoClient(host="localhost", port=27017)

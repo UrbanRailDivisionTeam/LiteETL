@@ -51,7 +51,8 @@ class load_data:
     source_sql: str
     taget_table: str
     target: str
-    
+
+
 class load(task):
     def __init__(self, data: load_data) -> None:
         super().__init__(data.name, data.logger_name)
@@ -80,6 +81,7 @@ class extract_data:
     taget_table: str
     source: str
 
+
 class extract(task):
     def __init__(self, data: extract_data) -> None:
         super().__init__(data.name, data.logger_name)
@@ -98,6 +100,7 @@ class extract(task):
     def __del__(self) -> None:
         self.source.close()
         self.target.close()
+
 
 @dataclass
 class sync_data:
@@ -125,10 +128,8 @@ class sync(task):
     def __del__(self) -> None:
         self.source.close()
         self.target.close()
-        
-        
-        
-        
+
+
 def get_diff(source_increase_df: pd.DataFrame, taget_increase_df: pd.DataFrame) -> tuple[list, list, list]:
     '''获取两个dataframe的不同'''
     new_diff = source_increase_df[~source_increase_df['id'].isin(taget_increase_df['id'])]['id'].tolist()
@@ -149,7 +150,8 @@ class load_increase_data:
     taget_table: str
     taget_increase_sql: str
     target: str
-    
+
+
 class load_increase(task):
     def __init__(self, data: load_increase_data) -> None:
         super().__init__(data.name, data.logger_name)
@@ -181,8 +183,16 @@ class load_increase(task):
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
+        try:
+            taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        except Exception as e:
+            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
+            self.trans_sync()
+
         source_increase_df: pd.DataFrame = self.source.sql(self.data.source_increase_sql).fetchdf()
-        taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        assert (taget_increase_df.columns.to_list() == source_increase_df.columns.to_list(), "本地增量判断和远程增量判断不一致,请检查对应的sql")  # type: ignore
+        assert ('id' in source_increase_df.columns and 'id' in taget_increase_df.columns, "增量判断的结构不符合要求,请检查对应的sql")  # type: ignore
+
         new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
@@ -202,7 +212,8 @@ class extract_increase_data:
     taget_table: str
     taget_increase_sql: str
     source: str
-    
+
+
 class extract_increase(task):
     def __init__(self, data: extract_increase_data) -> None:
         super().__init__(data.name, data.logger_name)
@@ -233,8 +244,16 @@ class extract_increase(task):
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
+        try:
+            taget_increase_df: pd.DataFrame = self.target.sql(self.data.taget_increase_sql).fetchdf()
+        except Exception as e:
+            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
+            self.trans_sync()
+
         source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-        taget_increase_df = self.target.sql(self.data.taget_increase_sql).fetchdf()
+        assert (taget_increase_df.columns.to_list() == source_increase_df.columns.to_list(), "本地增量判断和远程增量判断不一致,请检查对应的sql")  # type: ignore
+        assert ('id' in source_increase_df.columns and 'id' in taget_increase_df.columns, "增量判断的结构不符合要求,请检查对应的sql")  # type: ignore
+
         new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
@@ -286,8 +305,16 @@ class sync_increase(task):
         self.log.debug("已成功完成该主表的增量同步")
 
     def task_main(self) -> None:
+        try:
+            taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        except Exception as e:
+            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
+            self.trans_sync()
+
         source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-        taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
+        assert (taget_increase_df.columns.to_list() == source_increase_df.columns.to_list(), "本地增量判断和远程增量判断不一致,请检查对应的sql")  # type: ignore
+        assert ('id' in source_increase_df.columns and 'id' in taget_increase_df.columns, "增量判断的结构不符合要求,请检查对应的sql")  # type: ignore
+
         new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
