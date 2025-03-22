@@ -1,6 +1,4 @@
 import os
-
-from numpy import append
 from utils.config import CONFIG
 from tasks.base import task, extract_increase, extract_increase_data
 from tasks.process.ameliorate import ameliorate
