@@ -7,6 +7,7 @@ from sqlalchemy import text
 from abc import ABC, abstractmethod
 
 from tasks.scheduler import SCHEDULER
+from utils import connect
 from utils.config import CONFIG
 from utils.connect import CONNECT, DUCKDB
 from utils.logger import make_logger
@@ -61,8 +62,6 @@ class load(task):
         super().__init__(data.name, data.logger_name)
         self.data = data
         self.source = DUCKDB.cursor()
-        self.source.execute("CREATE SCHEMA IF NOT EXISTS dm")
-        self.source.execute("USE dm")
         self.target = CONNECT[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
@@ -81,7 +80,7 @@ class extract_data:
     name: str
     logger_name: str
     source_sql: str
-    taget_table: str
+    target_table: str
     source: str
 
 
@@ -91,13 +90,11 @@ class extract(task):
         self.data = data
         self.source = CONNECT[data.source]
         self.target = DUCKDB.cursor()
-        self.target.execute("CREATE SCHEMA IF NOT EXISTS ods")
-        self.target.execute("USE ods")
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
         temp_df = pd.read_sql(self.data.source_sql, self.source)
-        self.target.execute(f"CREATE OR REPLACE TABLE {self.data.taget_table} AS SELECT * FROM temp_df")
+        self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
     def __del__(self) -> None:
@@ -109,9 +106,10 @@ class extract(task):
 class sync_data:
     name: str
     logger_name: str
+    source: str
     source_sql: str
     taget_table: str
-    source: str
+    target_db: str
     target: str
 
 
@@ -125,7 +123,7 @@ class sync(task):
 
     def task_main(self) -> None:
         temp_df = pd.read_sql(self.data.source_sql, self.source)
-        index = temp_df.to_sql(self.data.taget_table, self.target, if_exists="replace")
+        index = temp_df.to_sql(name=self.data.taget_table, con=self.target, schema=self.data.target_db, if_exists="replace")
         self.log.debug(f"全量同步已完成，变更{str(index)}行")
 
     def __del__(self) -> None:
@@ -143,7 +141,8 @@ def get_diff(source_increase_df: pd.DataFrame, taget_increase_df: pd.DataFrame) 
     change_diff = common_ids[common_ids['is_diff']]['id'].tolist()
     return new_diff, del_diff, change_diff
 
-def get_database_metadata(conn: sqlalchemy.engine.Connection, db_type:str, schema: str, table: str) -> pd.DataFrame:
+
+def get_database_metadata(conn: sqlalchemy.engine.Connection, db_type: str, schema: str, table: str) -> pd.DataFrame:
     '''获取目标数据库目标表的元数据，用于监控数据库的结构变更'''
     if db_type in "mysql":
         return pd.read_sql(text(
@@ -207,7 +206,7 @@ def get_database_metadata(conn: sqlalchemy.engine.Connection, db_type:str, schem
         ), conn)
     else:
         raise ValueError("不支持的数据库类型")
-        
+
 
 @dataclass
 class load_increase_data:
@@ -215,9 +214,10 @@ class load_increase_data:
     logger_name: str
     source_sync_sql: str
     source_increase_sql: str
-    taget_table: str
-    taget_increase_sql: str
     target: str
+    target_table: str
+    target_db: str
+    target_increase_sql: str
 
 
 class load_increase(task):
@@ -225,58 +225,60 @@ class load_increase(task):
         super().__init__(data.name, data.logger_name)
         self.data = data
         self.source = DUCKDB.cursor()
-        self.source.execute("CREATE SCHEMA IF NOT EXISTS dm")
-        self.source.execute("USE dm")
         self.target = CONNECT[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
         df: pd.DataFrame = self.source.sql(self.data.source_sync_sql).fetchdf()
-        index = df.to_sql(self.data.taget_table, self.target, if_exists="replace")
+        index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
+        meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
+        self.source.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")
+        self.log.debug(f"已重建元数据")
 
-    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+    def task_main(self) -> None:
+        temp = self.source.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
+        if len(temp) == 0:
+            self.log.warning("本地未找到目标表的元数据缓存，转换为全量同步")
+            return self.trans_sync()
+        meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
+        local_meta_data: pd.DataFrame = self.source.sql(f"SELECT * FROM meta.{self.data.target_db}_{self.data.target_table}").fetchdf()
+        if not meta_data.equals(local_meta_data):
+            self.log.warning("目标表元数据和本地表元数据不同，转换为全量同步")
+            return self.trans_sync()
+        target_increase_df = pd.read_sql(self.data.target_increase_sql, self.target)
+        source_increase_df: pd.DataFrame = self.source.sql(self.data.source_increase_sql).fetchdf()
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, target_increase_df)
+        # 如果超过要求大小，退化为全量同步
+        change_len = len(new_diff) + len(change_diff)
+        if change_len > CONFIG.MAX_INCREASE_CHANGE:
+            self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)}，转换为全量同步")
+            return self.trans_sync()
+        # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
-            delete_statement = text(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+            delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
             self.target.execute(delete_statement)
             self.target.commit()
-
+        # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
             increase_df: pd.DataFrame = self.source.sql(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})").fetchdf()
-            increase_df.to_sql(self.data.taget_table, self.target, if_exists="append")
-
+            # 因为前文已经检查过目标表的结构了，一般情况下可以成功插入
+            increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
         self.log.debug("已成功完成该主表的增量同步")
-
-    def task_main(self) -> None:
-        try:
-            taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
-        except Exception as e:
-            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
-            self.trans_sync()
-        else:
-            source_increase_df: pd.DataFrame = self.source.sql(self.data.source_increase_sql).fetchdf()
-            new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
-            # 如果超过要求大小，退化为全量同步
-            change_len = len(new_diff) + len(change_diff)
-            if change_len > CONFIG.MAX_INCREASE_CHANGE:
-                self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
-                self.trans_sync()
-            else:
-                self.trans_increase(new_diff, del_diff, change_diff)
 
 
 @dataclass
 class extract_increase_data:
     name: str
     logger_name: str
+    source: str
     source_sync_sql: str
     source_increase_sql: str
-    taget_table: str
-    taget_increase_sql: str
-    source: str
+    target_table: str
+    target_increase_sql: str
 
 
 class extract_increase(task):
@@ -285,101 +287,109 @@ class extract_increase(task):
         self.data = data
         self.source = CONNECT[data.source]
         self.target = DUCKDB.cursor()
-        self.target.execute("CREATE SCHEMA IF NOT EXISTS ods")
-        self.target.execute("USE ods")
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
         temp_df = pd.read_sql(self.data.source_sync_sql, self.source)
-        self.target.execute(f"CREATE OR REPLACE TABLE {self.data.taget_table} AS SELECT * FROM temp_df")
+        self.target.execute(f"CREATE OR REPLACE TABLE {self.data.target_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
-    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+    def task_main(self) -> None:
+        temp = self.target.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'dm' AND table_name = '{self.data.target_table}'").fetchall()
+        if len(temp) == 0:
+            self.log.warning("本地未找到目标表，转换为全量同步")
+            return self.trans_sync()
+        taget_increase_df: pd.DataFrame = self.target.sql(self.data.target_increase_sql).fetchdf()
+        source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
+        # 如果超过要求大小，退化为全量同步
+        change_len = len(new_diff) + len(change_diff)
+        if change_len > CONFIG.MAX_INCREASE_CHANGE:
+            self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
+            return self.trans_sync()
+        # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
-            self.target.execute(f"DELETE FROM ods.{self.data.taget_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
-
+            self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+        # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
             select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
             increase_df = pd.read_sql(select_statement, self.source)
-            self.target.execute(f"INSERT INTO {self.data.taget_table} SELECT * FROM increase_df")
-
+            try:
+                self.target.execute(f"INSERT INTO {self.data.target_table} SELECT * FROM increase_df")
+            except Exception as e:
+                self.log.warning(e)
+                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
+                return self.trans_sync()
         self.log.debug("已成功完成该主表的增量同步")
-
-    def task_main(self) -> None:
-        try:
-            taget_increase_df: pd.DataFrame = self.target.sql(self.data.taget_increase_sql).fetchdf()
-        except Exception as e:
-            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
-            self.trans_sync()
-            return
-        else:
-            source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-            new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
-            # 如果超过要求大小，退化为全量同步
-            change_len = len(new_diff) + len(change_diff)
-            if change_len > CONFIG.MAX_INCREASE_CHANGE:
-                self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
-                self.trans_sync()
-            else:
-                self.trans_increase(new_diff, del_diff, change_diff)
 
 
 @dataclass
 class sync_increase_data:
     name: str
     logger_name: str
+    source: str
     source_sync_sql: str
     source_increase_sql: str
-    taget_table: str
-    taget_increase_sql: str
-    source: str
     target: str
+    target_db: str
+    target_table: str
+    target_increase_sql: str
 
 
 class sync_increase(task):
     def __init__(self, data: sync_increase_data) -> None:
         super().__init__(data.name, data.logger_name)
         self.data = data
+        self.local = DUCKDB.cursor()
         self.source = CONNECT[data.source]
         self.target = CONNECT[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
         df = pd.read_sql(self.data.source_sync_sql, self.source)
-        index = df.to_sql(self.data.taget_table, self.target, if_exists="replace")
+        index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
+        meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
+        self.local.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")
+        self.log.debug(f"已重建元数据")
 
-    def trans_increase(self, new_diff: list, del_diff: list, change_diff: list) -> None:
+    def task_main(self) -> None:
+        temp = self.local.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
+        if len(temp) == 0:
+            self.log.warning("本地未找到目标表的元数据缓存，转换为全量同步")
+            return self.trans_sync()
+        meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
+        local_meta_data: pd.DataFrame = self.local.sql(f"SELECT * FROM meta.{self.data.target_db}_{self.data.target_table}").fetchdf()
+        if not meta_data.equals(local_meta_data):
+            self.log.warning("目标表元数据和本地表元数据不同，转换为全量同步")
+            return self.trans_sync()
+        taget_increase_df = pd.read_sql(self.data.target_increase_sql, self.target)
+        source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
+        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
+        # 如果超过要求大小，退化为全量同步
+        change_len = len(new_diff) + len(change_diff)
+        if change_len > CONFIG.MAX_INCREASE_CHANGE:
+            self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
+            return self.trans_sync()
+        # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
-            delete_statement = text(f"DELETE FROM {self.data.taget_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+            delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
             self.target.execute(delete_statement)
             self.target.commit()
-
+        # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
             select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) AS subquery WHERE subquery.id in ({in_clause})")
-            pd.read_sql(select_statement, self.source).to_sql(self.data.taget_table, self.target, if_exists="append")  # 这里一定能添加成功，因为重复的行数已经删除了
-
+            increase_df = pd.read_sql(select_statement, self.source)
+            try:
+                increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
+            except Exception as e:
+                self.log.warning(e)
+                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
+                return self.trans_sync()
         self.log.debug("已成功完成该主表的增量同步")
-
-    def task_main(self) -> None:
-        try:
-            taget_increase_df = pd.read_sql(self.data.taget_increase_sql, self.target)
-        except Exception as e:
-            self.log.warning("获取本地同步缓存失败，增量转换为全量同步")
-            self.trans_sync()
-        else:
-            source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-            new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
-            # 如果超过要求大小，退化为全量同步
-            change_len = len(new_diff) + len(change_diff)
-            if change_len > CONFIG.MAX_INCREASE_CHANGE:
-                self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
-                self.trans_sync()
-            else:
-                self.trans_increase(new_diff, del_diff, change_diff)

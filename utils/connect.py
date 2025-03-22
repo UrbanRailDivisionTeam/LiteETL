@@ -45,8 +45,19 @@ class external_connecter:
         """关闭所有数据库连接"""
         for engine in self._connect.values():
             engine.dispose()
+            
+            
+def make_duckdb_connect():
+    # 在创建或者连接数据库时确保对应的数据库存在
+    duckdb_connect = duckdb.connect(os.path.realpath(os.path.join(CONFIG.SOURCE_PATH, "data.db")))
+    duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS ods")
+    duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS dwd")
+    duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS dm")
+    duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS logger")
+    duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS meta")
+    return duckdb_connect
 
 
 CONNECT = external_connecter()
-DUCKDB = duckdb.connect(os.path.realpath(os.path.join(CONFIG.SOURCE_PATH, "data.db")))
+DUCKDB = make_duckdb_connect()
 MONGO = pymongo.MongoClient(host="localhost", port=27017)

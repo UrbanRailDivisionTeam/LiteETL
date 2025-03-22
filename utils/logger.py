@@ -7,7 +7,6 @@ class duckdb_handler(logging.Handler):
         logging.Handler.__init__(self)
         self.name = name
         self.cursor = DUCKDB.cursor()
-        self.cursor.execute("CREATE SCHEMA IF NOT EXISTS logger")
         # 指定创建时间为默认时间戳，id自动生成
         self.cursor.execute(
             f'''

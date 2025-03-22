@@ -26,8 +26,8 @@ def task_init() -> list[task]:
                 source="mysql服务",
                 source_sync_sql=read_sql(os.path.join("ameliorate", "sync", "ameliorate.sql")),
                 source_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_source.sql")),
-                taget_table="ameliorate",
-                taget_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_target.sql")),
+                target_table="ameliorate",
+                target_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_target.sql")),
             )
         )
     tesk_1 = ameliorate()
