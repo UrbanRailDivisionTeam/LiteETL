@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from tasks.process import process
 from utils.config import CONFIG
+from utils.connect import MONGO
 
 class ameliorate(process):
     def __init__(self) -> None:

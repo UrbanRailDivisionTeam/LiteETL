@@ -7,7 +7,6 @@ from sqlalchemy import text
 from abc import ABC, abstractmethod
 
 from tasks.scheduler import SCHEDULER
-from utils import connect
 from utils.config import CONFIG
 from utils.connect import CONNECT, DUCKDB
 from utils.logger import make_logger
@@ -254,6 +253,8 @@ class load_increase(task):
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)}，转换为全量同步")
             return self.trans_sync()
+        else:
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
         # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
@@ -307,6 +308,8 @@ class extract_increase(task):
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
+        else:
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
         # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
@@ -374,6 +377,8 @@ class sync_increase(task):
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
+        else:
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
         # 删除目标表中需要删除的和需要变更的
         if len(del_diff) + len(change_diff) > 0:
             ids_to_delete = del_diff + change_diff
