@@ -9,13 +9,14 @@ class ameliorate(process):
     
     def task_main(self) -> None:
         data_index = pd.read_csv(os.path.join(CONFIG.TABLE_PATH, "城轨事业部改善指标.csv"), encoding="utf-8")
+        print()
         data: pd.DataFrame = self.connect.sql(
             f"""
                 SELECT 
                     bill."组室",
                     COUNT(bill."id") AS "提交数量"
                 FROM ods.ameliorate AS bill
-                WHERE bill."提案单位一级" = "城轨事业部" 
+                WHERE bill."提案单位一级" = '城轨事业部' 
                 AND bill."提交日期" >= DATE_TRUNC('MONTH', CURRENT_DATE)
                 AND bill."提交日期" < DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '1 MONTH'
                 GROUP BY bill."组室"

@@ -24,9 +24,9 @@ def task_init() -> list[task]:
                 name="改善数据处理",
                 logger_name="ameliorate",
                 source="mysql服务",
-                source_sync_sql=read_sql(os.path.join("ameliorate", "sync", "business_connection.sql")),
+                source_sync_sql=read_sql(os.path.join("ameliorate", "sync", "ameliorate.sql")),
                 source_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_source.sql")),
-                taget_table="business_connection_close",
+                taget_table="ameliorate",
                 taget_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_target.sql")),
             )
         )
