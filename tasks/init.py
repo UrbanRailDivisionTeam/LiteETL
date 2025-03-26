@@ -18,7 +18,8 @@ def trans_table_to_sql(table_name: str, schema_name: str | None = None) -> str:
 
 def task_init() -> list[task]:
     '''任务真真正进行初始化，并添加依赖关系的地方'''
-    # 任务初始化
+    tasks_group = []
+    # ----------改善相关任务----------
     tesk_0 = extract_increase(
             extract_increase_data(
                 name="改善数据处理",
@@ -31,11 +32,14 @@ def task_init() -> list[task]:
             )
         )
     tesk_1 = ameliorate()
-    
-    # 添加任务间关系
     tesk_0.then(tesk_1)
-    
-    # 整理首先要运行的任务
-    tasks_group = []
     tasks_group.append(tesk_0)
+
+    # ----------人员效能相关任务----------
+    
+    
+    # ----------设计变更业联统计----------
+    
+    
+    
     return tasks_group
