@@ -4,7 +4,6 @@ import duckdb
 import sqlalchemy
 from urllib.parse import quote_plus
 from utils.config import CONFIG, connect_config
-from utils.config import CONFIG, connect_config
 
 class external_connecter:
     def __init__(self) -> None:
@@ -60,4 +59,4 @@ def make_duckdb_connect():
 
 CONNECT = external_connecter()
 DUCKDB = make_duckdb_connect()
-MONGO = pymongo.MongoClient(host="172.24.97.186", port=27017)
+MONGO = pymongo.MongoClient(host=CONFIG.MONGO_IP, port=27017)

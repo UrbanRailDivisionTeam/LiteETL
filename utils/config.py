@@ -16,6 +16,8 @@ class config:
     """全局所有的配置"""
     # 所有的数据源连接配置
     CONNECT: dict[str, connect_config]
+    # 本地mongo的ip
+    MONGO_IP: str
     # 资源文件对应的路径
     SOURCE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "source")
     SELECT_PATH = os.path.join(SOURCE_PATH, "select")
@@ -28,9 +30,10 @@ class config:
     DEFAULT_BATCH_SIZE = 100000
 
 
-debug = True
-if debug:
+DEBUG = True
+if DEBUG:
     CONFIG = config(
+        MONGO_IP = "172.24.97.186",
         CONNECT={
             "mysql服务": connect_config(
                 dbtype="mysql",
@@ -68,6 +71,7 @@ if debug:
     )
 else:
     CONFIG = config(
+        MONGO_IP = "localhost",
         CONNECT={
             "相关方数据库": connect_config(
                 dbtype="pgsql",

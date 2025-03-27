@@ -1,5 +1,5 @@
 import os
-from utils.config import CONFIG
+from utils.config import CONFIG, DEBUG
 from tasks.base import task, extract_increase, extract_increase_data
 from tasks.process.ameliorate import ameliorate
 
@@ -24,7 +24,7 @@ def task_init() -> list[task]:
             extract_increase_data(
                 name="改善数据处理",
                 logger_name="ameliorate",
-                source="mysql服务",
+                source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
                 source_sync_sql=read_sql(os.path.join("ameliorate", "sync", "ameliorate.sql")),
                 source_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_source.sql")),
                 target_table="ameliorate",
