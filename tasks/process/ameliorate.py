@@ -59,7 +59,7 @@ class ameliorate(process):
         for _, dep in data_department.iterrows():
             temp = {}
             temp["m_name"] = str(dep["部门"])
-            temp["rate"] = int(dep["提交数量"]) / int(dep["提交指标"]) if int(dep["提交指标"]) != 0 else 1
+            temp["rate"] = int(dep["提交数量"]) / int(dep["提交指标"]) * 100 if int(dep["提交指标"]) != 0 else 100
             temp["completed"] = int(dep["提交数量"])
             temp["target"] = int(dep["提交指标"])
             temp["sub"] = []
@@ -67,7 +67,7 @@ class ameliorate(process):
                 if ch["部门"] == dep["部门"]:
                     temp_sub = {}
                     temp_sub["m_name"] = str(ch["组室"])
-                    temp_sub["rate"] = int(ch["提交数量"]) / int(ch["提交指标"]) if int(ch["提交指标"]) != 0 else 1
+                    temp_sub["rate"] = int(ch["提交数量"]) / int(ch["提交指标"])  * 100 if int(ch["提交指标"]) != 0 else 100
                     temp_sub["completed"] = int(ch["提交数量"])
                     temp_sub["target"] = int(ch["提交指标"])
                     temp["sub"].append(temp_sub)
