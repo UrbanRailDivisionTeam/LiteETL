@@ -40,14 +40,6 @@ if debug:
                 password="Swq8855830.",
                 database="crrc_secd"
             ),
-            "clickhouse服务": connect_config(
-                dbtype="mysql",
-                ip="localhost",
-                port=9004,
-                user="cheakf",
-                password="Swq8855830.",
-                database="default"
-            ),
             "pgsql服务": connect_config(
                 dbtype="pgsql",
                 ip="172.17.16.214",
