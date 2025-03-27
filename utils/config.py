@@ -34,7 +34,7 @@ if debug:
         CONNECT={
             "mysql服务": connect_config(
                 dbtype="mysql",
-                ip="172.17.16.214",
+                ip="172.24.97.186",
                 port=3306,
                 user="swq",
                 password="Swq8855830.",
@@ -42,7 +42,7 @@ if debug:
             ),
             "pgsql服务": connect_config(
                 dbtype="pgsql",
-                ip="172.17.16.214",
+                ip="172.24.97.186",
                 port=5432,
                 user="cheakf",
                 password="Swq8855830.",
@@ -50,7 +50,7 @@ if debug:
             ),
             "oracle服务": connect_config(
                 dbtype="oracle",
-                ip="172.17.16.214",
+                ip="172.24.97.186",
                 port=1521,
                 user="system",
                 password="Swq8855830.",
@@ -58,7 +58,7 @@ if debug:
             ),
             "sqlserver服务": connect_config(
                 dbtype="sqlserver",
-                ip="172.17.16.214",
+                ip="172.24.97.186",
                 port=1433,
                 user="cheakf",
                 password="Swq8855830.",

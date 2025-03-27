@@ -60,4 +60,4 @@ def make_duckdb_connect():
 
 CONNECT = external_connecter()
 DUCKDB = make_duckdb_connect()
-MONGO = pymongo.MongoClient(host="localhost", port=27017)
+MONGO = pymongo.MongoClient(host="172.24.97.186", port=27017)

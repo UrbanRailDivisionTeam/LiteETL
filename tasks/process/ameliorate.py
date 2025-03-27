@@ -66,27 +66,13 @@ class ameliorate(process):
             for _, ch in data_group.iterrows():
                 if ch["部门"] == dep["部门"]:
                     temp_sub = {}
-                    temp_sub["m_name"] = str(dep["组室"])
-                    temp_sub["rate"] = int(dep["提交数量"]) / int(dep["提交指标"]) if int(dep["提交指标"]) != 0 else 1
-                    temp_sub["completed"] = int(dep["提交数量"])
-                    temp_sub["target"] = int(dep["提交指标"])
+                    temp_sub["m_name"] = str(ch["组室"])
+                    temp_sub["rate"] = int(ch["提交数量"]) / int(ch["提交指标"]) if int(ch["提交指标"]) != 0 else 1
+                    temp_sub["completed"] = int(ch["提交数量"])
+                    temp_sub["target"] = int(ch["提交指标"])
                     temp["sub"].append(temp_sub)
             data_template.append(temp)
         collection  = MONGO["lite_web"]["staff_improvement_analysis"]
-        # 开启一个会话
-        with MONGO.start_session() as session:
-            try:
-                session.start_transaction()
-                collection.delete_many({}, session=session)
-                collection.insert_many(data_template, session=session)
-                session.commit_transaction()
-            except OperationFailure as e:
-                session.abort_transaction()
-                self.log.error(f"数据库事务失败，已回滚：{e}")
-            except Exception as e:
-                session.abort_transaction()
-                self.log.error(f"发生错误，已回滚：{e}")
-            finally:
-                session.end_session()
-            
+        collection.delete_many({})
+        collection.insert_many(data_template)
             

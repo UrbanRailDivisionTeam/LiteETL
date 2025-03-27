@@ -43,7 +43,7 @@ class task(ABC):
         # 如果存在对应的依赖任务，则添加到调度器中
         SCHEDULER.append(self.next)
         self.is_run = True
-        self.log.info("依赖任务已添加到线程池，任务已完成")
+        self.log.info(f"依赖任务已添加到线程池，{self.name} 任务已完成")
 
 
 @dataclass

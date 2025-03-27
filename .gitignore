@@ -5,5 +5,7 @@ __pycache__/
 __pypackages__/
 
 .vscode
+.python-version
+uv.lock
 source/*.db
 source/*.wal
