@@ -1,5 +1,5 @@
 SELECT
-    f.fk_crrc_proposal_no as "id",
+    CONCAT(f.fk_crrc_proposal_no, DATE_FORMAT(f.FCREATETIME, '%%d-%%m-%%Y %%H:%%i:%%s')) as "id",
     (
         case f.fk_crrc_proposal_status
             when "A" then "暂存"

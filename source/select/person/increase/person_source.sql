@@ -1,5 +1,10 @@
 SELECT
-    p.FID AS "id",
+    p.FID || p.FIDCardNO AS "id",
+    p.FNumber AS "员工编码",
     p.FLASTUPDATETIME AS "上次更新时间"
 FROM
     EAS86.T_BD_PERSON p
+WHERE
+    p.FEmployeetypeiD <> '00000000-0000-0000-0000-000000000031A29E85B3'
+    AND p.FEmployeetypeiD <> 'FTCmJT3SSRi1twufIaRb56KehbM='
+    AND p.FEmployeetypeiD <> '00000000-0000-0000-0000-000000000008A29E85B3'

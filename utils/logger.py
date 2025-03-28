@@ -37,7 +37,7 @@ def make_logger(logger_name: str, table_name: str)-> logging.Logger:
     console.setLevel(logging.DEBUG)
     console.setFormatter(
         colorlog.ColoredFormatter(
-            '%(log_color)s%(name)s:%(levelname)s: %(asctime)s %(message)s:',
+            '%(log_color)s%(name)s:%(levelname)s: %(asctime)s %(message)s',
             log_colors={
                 'DEBUG': 'cyan',
                 'INFO': 'green',

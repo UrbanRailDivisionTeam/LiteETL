@@ -23,19 +23,19 @@ class scheduler:
         # 没有依赖可以直接运行
         if len(input_task.depend) == 0:
             return True
-        # 已经运行完不可再次运行
-        if input_task.is_run:
+        # 已经开始运行不可再次运行
+        if input_task.start_run:
             return False
         # 检查依赖是否全运行完成，全运行完成可以运行
         for _tasks in self.task_list:
-            if _tasks.name in input_task.depend and not _tasks.is_run:
+            if _tasks.name in input_task.depend and not _tasks.end_run:
                 return False
         return True
 
     def can_stop(self) -> bool:
         # 如果所有任务均运行完成即可退出
         for _tasks in self.task_list:
-            if not _tasks.is_run:
+            if not _tasks.end_run:
                 return False
         return True
     
@@ -48,7 +48,8 @@ class scheduler:
             if self.can_stop():
                 break
             # 一般抽取任务最少也要0.1秒完成，0.5秒检查一次
-            time.sleep(0.5)
+            time.sleep(0.1)
+        self.log.info("调度器已执行完成")
     
     @staticmethod
     def get_cpu_count():

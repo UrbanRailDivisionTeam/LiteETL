@@ -16,7 +16,8 @@ class task(ABC):
 
     def __init__(self, name: str, logger_name: str) -> None:
         self.name = name
-        self.is_run = False
+        self.start_run = False
+        self.end_run = False
         self.log = make_logger(name, logger_name)
         self.depend: list[str] = []
 
@@ -33,16 +34,17 @@ class task(ABC):
 
     def run(self) -> None:
         # 真正运行函数的地方
-        start_time = time.time()
-        try:
-            self.task_main()
-        except Exception as e:
-            self.log.critical("报错内容：" + str(e))
-            self.log.critical("报错堆栈信息：" + str(traceback.format_exc()))
-        end_time = time.time()
-        self.log.info("函数花费时间为:{} 秒".format(end_time - start_time))
-        self.is_run = True
-        self.log.info(f"依赖任务已添加到线程池，{self.name} 任务已完成")
+        if not self.start_run and not self.end_run:
+            self.start_run = True
+            start_time = time.time()
+            try:
+                self.task_main()
+            except Exception as e:
+                self.log.critical("报错内容：" + str(e))
+                self.log.critical("报错堆栈信息：" + str(traceback.format_exc()))
+            end_time = time.time()
+            self.end_run = True
+            self.log.info("函数花费时间为:{} 秒,".format(end_time - start_time) + f"{self.name} 任务已完成")
 
 
 @dataclass
@@ -129,14 +131,35 @@ class sync(task):
         self.target.close()
 
 
-def get_diff(source_increase_df: pd.DataFrame, taget_increase_df: pd.DataFrame) -> tuple[list, list, list]:
+def get_diff(source_increase_df: pd.DataFrame, target_increase_df: pd.DataFrame) -> tuple[list, list, list]:
     '''获取两个dataframe的不同'''
-    new_diff = source_increase_df[~source_increase_df['id'].isin(taget_increase_df['id'])]['id'].tolist()
-    del_diff = taget_increase_df[~taget_increase_df['id'].isin(source_increase_df['id'])]['id'].tolist()
-    common_ids = pd.merge(source_increase_df, taget_increase_df, on='id', how='inner', suffixes=('_a', '_b'))
+    if source_increase_df.columns.to_list() != target_increase_df.columns.to_list():
+        raise ValueError("增量检查的数据列名不同")
+    
+    new_diff = source_increase_df[~source_increase_df['id'].isin(target_increase_df['id'])]['id'].tolist()
+    del_diff = target_increase_df[~target_increase_df['id'].isin(source_increase_df['id'])]['id'].tolist()
+    # 获取共同ID的记录
+    common_ids = pd.merge(source_increase_df, target_increase_df, on='id', how='inner', suffixes=('_a', '_b'))
+    # 正确处理NaN值比较
+    def compare_with_nan(row, col):
+        a_val, b_val = row[f'{col}_a'], row[f'{col}_b']
+        if pd.isna(a_val) and pd.isna(b_val):
+            return False  # 两个NaN值视为相等
+        elif pd.isna(a_val) or pd.isna(b_val):
+            return True   # 一个NaN一个非NaN视为不等
+        else:
+            return a_val != b_val
+    # 修复：只比较非id列，避免尝试访问不存在的'id_a'和'id_b'
     columns_to_check = [col for col in source_increase_df.columns if col != 'id']
-    common_ids['is_diff'] = common_ids.apply(lambda row: any(row[f'{col}_a'] != row[f'{col}_b'] for col in columns_to_check), axis=1)
-    change_diff = common_ids[common_ids['is_diff']]['id'].tolist()
+    common_ids['is_diff'] = common_ids.apply(
+        lambda row: any(compare_with_nan(row, col) for col in columns_to_check), 
+        axis=1
+    )
+    change_diff = common_ids[common_ids['is_diff']]
+    if len(change_diff):
+        change_diff = common_ids[common_ids['is_diff']]['id'].tolist()
+    else:
+        change_diff = []
     return new_diff, del_diff, change_diff
 
 
