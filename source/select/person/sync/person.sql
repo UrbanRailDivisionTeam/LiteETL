@@ -1,5 +1,5 @@
 SELECT
-    p.FID || p.FIDCardNO AS "id",
+    p.FID || p.FIDCardNO AS id,
     p.FLASTUPDATETIME AS "上次更新时间",
     p.FNumber AS "员工编码",
     p.fname_l2 AS "员工姓名",

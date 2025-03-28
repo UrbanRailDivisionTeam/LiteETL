@@ -1,5 +1,5 @@
 SELECT
-    CONCAT(f.fk_crrc_proposal_no, DATE_FORMAT(f.FCREATETIME, '%%d-%%m-%%Y %%H:%%i:%%s')) as "id",
+    CONCAT(f.fk_crrc_proposal_no, TIME_TO_SEC(f.FCREATETIME)) as id,
     f.fk_crrc_proposal_name as "题案名称",
     (
         case f.fk_crrc_proposal_status

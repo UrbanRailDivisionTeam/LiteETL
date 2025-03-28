@@ -20,7 +20,6 @@ class ameliorate(process):
                 left join ods.person as ps on bill."第一题案人工号" = ps."员工编码"
                 WHERE bill."提案单位一级" = '城轨事业部' 
                 AND bill."提交日期" >= DATE_TRUNC('MONTH', CURRENT_DATE)
-                AND bill."提交日期" < DATE_TRUNC('MONTH', CURRENT_DATE) + INTERVAL '1 MONTH'
                 GROUP BY bill."组室"
             """
         ).fetchdf()
