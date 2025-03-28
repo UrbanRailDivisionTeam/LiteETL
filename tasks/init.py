@@ -22,7 +22,7 @@ def task_init() -> list[task]:
     # ----------改善相关任务----------
     tesk_0 = extract_increase(
             extract_increase_data(
-                name="改善数据处理",
+                name="改善数据抽取",
                 logger_name="ameliorate",
                 source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
                 source_sync_sql=read_sql(os.path.join("ameliorate", "sync", "ameliorate.sql")),
@@ -34,7 +34,21 @@ def task_init() -> list[task]:
     tesk_1 = ameliorate()
     tesk_0.then(tesk_1)
     tasks_group.append(tesk_0)
-
+    
+    # ----------人员基础数据抽取----------
+    tesk_0 = extract_increase(
+            extract_increase_data(
+                name="人员数据抽取",
+                logger_name="person",
+                source="SHR" if not DEBUG else "oracle服务",
+                source_sync_sql=read_sql(os.path.join("person", "sync", "person.sql")),
+                source_increase_sql=read_sql(os.path.join("person", "increase", "person_source.sql")),
+                target_table="person",
+                target_increase_sql=read_sql(os.path.join("person", "increase", "person_target.sql")),
+            )
+        )
+    tasks_group.append(tesk_0)
+    
     # ----------人员效能相关任务----------
     
     

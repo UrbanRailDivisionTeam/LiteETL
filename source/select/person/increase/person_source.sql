@@ -1,0 +1,5 @@
+SELECT
+    p.FID AS "FID",
+    p.FLASTUPDATETIME AS "上次更新时间"
+FROM
+    EAS86.T_BD_PERSON p

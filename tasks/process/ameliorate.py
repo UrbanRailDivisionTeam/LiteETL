@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from pymongo.errors import OperationFailure
 
 from tasks.process import process
 from utils.config import CONFIG
