@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from sqlalchemy import text
 from abc import ABC, abstractmethod
 
-from tasks.scheduler import SCHEDULER
 from utils.config import CONFIG
 from utils.connect import CONNECT, DUCKDB
 from utils.logger import make_logger
@@ -19,10 +18,12 @@ class task(ABC):
         self.name = name
         self.is_run = False
         self.log = make_logger(name, logger_name)
-        self.next: list[task] = []
+        self.depend: list[str] = []
 
-    def then(self, input_task: 'task') -> 'task':
-        self.next.append(input_task)
+    def dp(self, task_name: 'task') -> 'task':
+        if task_name.name == self.name:
+            raise ValueError("不能将自己设置为前置依赖")
+        self.depend.append(task_name.name)
         return self
 
     @abstractmethod
@@ -40,8 +41,6 @@ class task(ABC):
             self.log.critical("报错堆栈信息：" + str(traceback.format_exc()))
         end_time = time.time()
         self.log.info("函数花费时间为:{} 秒".format(end_time - start_time))
-        # 如果存在对应的依赖任务，则添加到调度器中
-        SCHEDULER.append(self.next)
         self.is_run = True
         self.log.info(f"依赖任务已添加到线程池，{self.name} 任务已完成")
 

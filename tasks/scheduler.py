@@ -1,4 +1,5 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from utils.logger import make_logger
 
@@ -8,28 +9,46 @@ if TYPE_CHECKING:
 
 class scheduler:
     def __init__(self) -> None:
-        self.tasks: list['task'] = []
+        self.task_list: list['task'] = []
         self.log = make_logger("ETL负载调度器", "etl_scheduler")
         num = self.get_cpu_count()
         self.log.info(f"线程池线程数为{str(num)}")
         self.tpool = ThreadPoolExecutor(max_workers=num)
         self.log.info("调度器初始化已完成")
-    
-    def is_runed(self) -> bool:
-        '''检查所有任务是否均以运行完成'''
-        for temp_task in self.tasks:
-            if not temp_task.is_run:
-                return False
-        return True
         
     def stop(self) -> None:
         self.tpool.shutdown(wait=False, cancel_futures=True)
     
-    def append(self, input_tasks: list['task']) -> 'scheduler':
-        self.tasks += input_tasks
-        for temp_task in input_tasks:
-            self.tpool.submit(temp_task.run)
-        return self
+    def can_start(self, input_task: 'task') -> bool:
+        # 没有依赖可以直接运行
+        if len(input_task.depend) == 0:
+            return True
+        # 已经运行完不可再次运行
+        if input_task.is_run:
+            return False
+        # 检查依赖是否全运行完成，全运行完成可以运行
+        for _tasks in self.task_list:
+            if _tasks.name in input_task.depend and not _tasks.is_run:
+                return False
+        return True
+
+    def can_stop(self) -> bool:
+        # 如果所有任务均运行完成即可退出
+        for _tasks in self.task_list:
+            if not _tasks.is_run:
+                return False
+        return True
+    
+    def run(self, input_tasks: list['task']) -> None:
+        self.task_list = input_tasks
+        while True:
+            for _task in self.task_list:
+                if self.can_start(_task):
+                    self.tpool.submit(_task.run)
+            if self.can_stop():
+                break
+            # 一般抽取任务最少也要0.1秒完成，0.5秒检查一次
+            time.sleep(0.5)
     
     @staticmethod
     def get_cpu_count():
