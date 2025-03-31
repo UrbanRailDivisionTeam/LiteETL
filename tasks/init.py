@@ -1,6 +1,6 @@
 import os
 from utils.config import CONFIG, DEBUG
-from utils.connect import connecter, connect_data
+from utils.connect import connect_data
 from tasks.base import task, extract_increase, extract_increase_data
 from tasks.process.ameliorate import ameliorate
 
@@ -20,7 +20,6 @@ def trans_table_to_sql(table_name: str, schema_name: str | None = None) -> str:
 
 def task_init(connect_data: connect_data) -> list[task]:
     '''任务进行初始化，并添加依赖关系的地方'''
-    
     task_0 = extract_increase(
         connect_data,
         extract_increase_data(
@@ -39,6 +38,18 @@ def task_init(connect_data: connect_data) -> list[task]:
             name="人员基础数据抽取",
             logger_name="person",
             source="SHR" if not DEBUG else "oracle服务",
+            source_sync_sql=read_sql(os.path.join("person", "sync", "person.sql")),
+            source_increase_sql=read_sql(os.path.join("person", "increase", "person_source.sql")),
+            target_table="person",
+            target_increase_sql=read_sql(os.path.join("person", "increase", "person_target.sql")),
+        )
+    )
+    task_1 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="相关方安全数据抽取",
+            logger_name="security_of_interested_parties",
+            source="相关方数据库" if not DEBUG else "pgsql服务",
             source_sync_sql=read_sql(os.path.join("person", "sync", "person.sql")),
             source_increase_sql=read_sql(os.path.join("person", "increase", "person_source.sql")),
             target_table="person",

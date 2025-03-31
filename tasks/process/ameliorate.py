@@ -68,4 +68,8 @@ class ameliorate(process):
         m_collection = self.mongo["lite_web"]["staff_improvement_analysis"]
         m_collection.delete_many({})
         m_collection.insert_many(data_template)
-            
+        
+        m_collection = self.mongo["lite_web"]["staff_improvement_data"]
+        m_collection.delete_many({})
+        m_collection.insert_many(data_template)
+        
