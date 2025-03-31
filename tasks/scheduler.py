@@ -1,5 +1,6 @@
 import os
 import time
+import duckdb
 from concurrent.futures import ThreadPoolExecutor
 from utils.logger import make_logger
 
@@ -8,9 +9,9 @@ if TYPE_CHECKING:
     from tasks.base import task
 
 class scheduler:
-    def __init__(self) -> None:
+    def __init__(self, _duckdb: duckdb.DuckDBPyConnection) -> None:
         self.task_list: list['task'] = []
-        self.log = make_logger("ETL负载调度器", "etl_scheduler")
+        self.log = make_logger(_duckdb, "ETL负载调度器", "etl_scheduler")
         num = self.get_cpu_count()
         self.log.info(f"线程池线程数为{str(num)}")
         self.tpool = ThreadPoolExecutor(max_workers=num)
@@ -56,5 +57,3 @@ class scheduler:
         num = os.cpu_count()
         num = num * 2 if not num is None else 5
         return num
-            
-SCHEDULER = scheduler()

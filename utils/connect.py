@@ -2,10 +2,11 @@ import os
 import pymongo
 import duckdb
 import sqlalchemy
+from dataclasses import dataclass
 from urllib.parse import quote_plus
 from utils.config import CONFIG, connect_config
 
-class external_connecter:
+class connecter:
     def __init__(self) -> None:
         self._connect: dict[str, sqlalchemy.Engine] = {}
         self.make_client(CONFIG.CONNECT)
@@ -44,19 +45,28 @@ class external_connecter:
         """关闭所有数据库连接"""
         for engine in self._connect.values():
             engine.dispose()
-            
-            
-def make_duckdb_connect():
-    # 在创建或者连接数据库时确保对应的数据库存在
+
+@dataclass
+class connect_data:
+    duckdb: duckdb.DuckDBPyConnection
+    mongo: pymongo.MongoClient
+    connect: connecter     
+
+def make_coonect() -> connect_data:
     duckdb_connect = duckdb.connect(os.path.realpath(os.path.join(CONFIG.SOURCE_PATH, "data.db")))
+    # 在创建或者连接数据库时确保对应的数据库存在
     duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS ods")
     duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS dwd")
     duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS dm")
     duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS logger")
     duckdb_connect.execute("CREATE SCHEMA IF NOT EXISTS meta")
-    return duckdb_connect
+    
+    client = pymongo.MongoClient(host=CONFIG.MONGO_IP, port=27017)
+    _connect = connect_data(
+        duckdb = duckdb_connect,
+        mongo = client,
+        connect = connecter()
+    )
+    return _connect
 
 
-CONNECT = external_connecter()
-DUCKDB = make_duckdb_connect()
-MONGO = pymongo.MongoClient(host=CONFIG.MONGO_IP, port=27017)

@@ -1,13 +1,13 @@
 import os
 import pandas as pd
 from tasks.process import process
+from utils.connect import connect_data
 from utils.config import CONFIG
-from utils.connect import MONGO
-
 
 class ameliorate(process):
-    def __init__(self) -> None:
-        super().__init__("全员型改善数据分析", "ameliorate_process")
+    def __init__(self, connect: connect_data) -> None:
+        super().__init__(connect.duckdb, "全员型改善数据分析", "ameliorate_process")
+        self.mongo = connect.mongo
 
     def task_main(self) -> None:
         data_index = pd.read_csv(os.path.join(CONFIG.TABLE_PATH, "城轨事业部改善指标.csv"), encoding="utf-8")
@@ -20,7 +20,7 @@ class ameliorate(process):
                 left join ods.person as ps on bill."第一题案人工号" = ps."员工编码"
                 WHERE bill."提案单位一级" = '城轨事业部' 
                 AND bill."提交日期" >= DATE_TRUNC('MONTH', CURRENT_DATE)
-                GROUP BY bill."组室"
+                GROUP BY ps."末级组织名称"
             """
         ).fetchdf()
         data_group: pd.DataFrame = self.connect.sql(
@@ -65,7 +65,7 @@ class ameliorate(process):
                     temp_sub["target"] = int(ch["提交指标"])
                     temp["sub"].append(temp_sub)
             data_template.append(temp)
-        m_collection = MONGO["lite_web"]["staff_improvement_analysis"]
+        m_collection = self.mongo["lite_web"]["staff_improvement_analysis"]
         m_collection.delete_many({})
         m_collection.insert_many(data_template)
             

@@ -1,12 +1,12 @@
 import logging
 import colorlog
-from utils.connect import DUCKDB
+import duckdb
 
 class duckdb_handler(logging.Handler):
-    def __init__(self, name: str) -> None:
+    def __init__(self, _duckdb: duckdb.DuckDBPyConnection, name: str) -> None:
         logging.Handler.__init__(self)
         self.name = name
-        self.cursor = DUCKDB.cursor()
+        self.cursor = _duckdb.cursor()
         # 指定创建时间为默认时间戳，id自动生成
         self.cursor.execute(
             f'''
@@ -29,7 +29,7 @@ class duckdb_handler(logging.Handler):
             self.handleError(record)
 
 
-def make_logger(logger_name: str, table_name: str)-> logging.Logger:
+def make_logger(_duckdb: duckdb.DuckDBPyConnection, logger_name: str, table_name: str)-> logging.Logger:
     """生成日志的工厂方法"""
     temp_log = logging.getLogger(logger_name)
     temp_log.setLevel(logging.DEBUG)
@@ -48,7 +48,7 @@ def make_logger(logger_name: str, table_name: str)-> logging.Logger:
             datefmt='## %Y-%m-%d %H:%M:%S'
         ))
     temp_log.addHandler(console)
-    mongoio = duckdb_handler(table_name)
+    mongoio = duckdb_handler(_duckdb, table_name)
     mongoio.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(levelname)s:%(message)s')
     mongoio.setFormatter(formatter)

@@ -1,4 +1,5 @@
 import time
+import duckdb
 import traceback
 import sqlalchemy
 import pandas as pd
@@ -7,18 +8,16 @@ from sqlalchemy import text
 from abc import ABC, abstractmethod
 
 from utils.config import CONFIG
-from utils.connect import CONNECT, DUCKDB
+from utils.connect import connect_data
 from utils.logger import make_logger
-
 
 class task(ABC):
     '''所有任务的抽象'''
-
-    def __init__(self, name: str, logger_name: str) -> None:
+    def __init__(self, _duckdb: duckdb.DuckDBPyConnection, name: str, logger_name: str) -> None:
         self.name = name
         self.start_run = False
         self.end_run = False
-        self.log = make_logger(name, logger_name)
+        self.log = make_logger(_duckdb, name, logger_name)
         self.depend: list[str] = []
 
     def dp(self, task_name: 'task') -> 'task':
@@ -58,11 +57,11 @@ class load_data:
 
 
 class load(task):
-    def __init__(self, data: load_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: load_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.source = DUCKDB.cursor()
-        self.target = CONNECT[data.target]
+        self.source = connect.duckdb.cursor()
+        self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
@@ -85,11 +84,11 @@ class extract_data:
 
 
 class extract(task):
-    def __init__(self, data: extract_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: extract_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.source = CONNECT[data.source]
-        self.target = DUCKDB.cursor()
+        self.source = connect.connect[data.source]
+        self.target = connect.duckdb.cursor()
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
@@ -114,11 +113,11 @@ class sync_data:
 
 
 class sync(task):
-    def __init__(self, data: sync_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: sync_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.source = CONNECT[data.source]
-        self.target = CONNECT[data.target]
+        self.source = connect.connect[data.source]
+        self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def task_main(self) -> None:
@@ -242,11 +241,11 @@ class load_increase_data:
 
 
 class load_increase(task):
-    def __init__(self, data: load_increase_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: load_increase_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.source = DUCKDB.cursor()
-        self.target = CONNECT[data.target]
+        self.source = connect.duckdb.cursor()
+        self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
@@ -305,11 +304,11 @@ class extract_increase_data:
 
 
 class extract_increase(task):
-    def __init__(self, data: extract_increase_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: extract_increase_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.source = CONNECT[data.source]
-        self.target = DUCKDB.cursor()
+        self.source = connect.connect[data.source]
+        self.target = connect.duckdb.cursor()
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
@@ -365,12 +364,12 @@ class sync_increase_data:
 
 
 class sync_increase(task):
-    def __init__(self, data: sync_increase_data) -> None:
-        super().__init__(data.name, data.logger_name)
+    def __init__(self, connect: connect_data, data: sync_increase_data) -> None:
+        super().__init__(connect.duckdb, data.name, data.logger_name)
         self.data = data
-        self.local = DUCKDB.cursor()
-        self.source = CONNECT[data.source]
-        self.target = CONNECT[data.target]
+        self.local = connect.duckdb.cursor()
+        self.source = connect.connect[data.source]
+        self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
