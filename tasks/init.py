@@ -50,10 +50,10 @@ def task_init(connect_data: connect_data) -> list[task]:
             name="相关方安全数据抽取",
             logger_name="interested_party",
             source="相关方数据库" if not DEBUG else "pgsql服务",
-            source_sync_sql=read_sql(os.path.join("interested_party", "sync", "interested_party.sql")),
-            source_increase_sql=read_sql(os.path.join("interested_party", "increase", "interested_party_source.sql")),
+            source_sync_sql=read_sql(os.path.join("interested_party", "interested_party", "sync", "interested_party.sql")),
+            source_increase_sql=read_sql(os.path.join("interested_party", "interested_party", "increase", "interested_party_source.sql")),
             target_table="interested_party",
-            target_increase_sql=read_sql(os.path.join("interested_party", "increase", "interested_party_target.sql")),
+            target_increase_sql=read_sql(os.path.join("interested_party", "interested_party", "increase", "interested_party_target.sql")),
         )
     )
     task_e3 = extract_increase(
@@ -62,98 +62,98 @@ def task_init(connect_data: connect_data) -> list[task]:
             name="相关方安全随行人员数据抽取",
             logger_name="interested_party_entry",
             source="相关方数据库" if not DEBUG else "pgsql服务",
-            source_sync_sql=read_sql(os.path.join("interested_party_entry", "sync", "interested_party_entry.sql")),
-            source_increase_sql=read_sql(os.path.join("interested_party_entry", "increase", "interested_party_entry_source.sql")),
+            source_sync_sql=read_sql(os.path.join("interested_party", "interested_party_entry", "sync", "interested_party_entry.sql")),
+            source_increase_sql=read_sql(os.path.join("interested_party", "interested_party_entry", "increase", "interested_party_entry_source.sql")),
             target_table="interested_party_entry",
-            target_increase_sql=read_sql(os.path.join("interested_party_entry", "increase", "interested_party_entry_target.sql")),
+            target_increase_sql=read_sql(os.path.join("interested_party", "interested_party_entry", "increase", "interested_party_entry_target.sql")),
         )
     )
-    task_e4 = extract_increase(
-        connect_data,
-        extract_increase_data(
-            name="业联-业务联系书数据抽取",
-            logger_name="business_connection",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sync_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
-            source_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_source.sql")),
-            target_table="business_connection",
-            target_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_target.sql")),
-        )
-    )
-    task_e5 = extract(
-        connect_data,
-        extract_data(
-            name="业联-业务联系书主送人数据抽取",
-            logger_name="business_connection_main_delivery_unit",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sql=read_sql(os.path.join("business_connection", "business_connection_main_delivery_unit.sql")),
-            target_table="business_connection_main_delivery_unit"
-        )
-    )
-    task_e6 = extract(
-        connect_data,
-        extract_data(
-            name="业联-业务联系书抄送人数据抽取",
-            logger_name="business_connection_copy_delivery_unit",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sql=read_sql(os.path.join("business_connection", "business_connection_copy_delivery_unit.sql")),
-            target_table="business_connection_copy_delivery_unit"
-        )
-    )
-    task_e7 = extract_increase(
-        connect_data,
-        extract_increase_data(
-            name="业联-业联执行关闭数据抽取",
-            logger_name="business_connection_close",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sync_sql=read_sql(os.path.join("business_connection", "business_connection_close", "sync", "business_connection_close.sql")),
-            source_increase_sql=read_sql(os.path.join("business_connection", "business_connection_close", "increase", "business_connection_close_source.sql")),
-            target_table="business_connection_close",
-            target_increase_sql=read_sql(os.path.join("business_connection", "business_connection_close", "increase", "business_connection_close_target.sql")),
-        )
-    )
-    task_e8 = extract_increase(
-        connect_data,
-        extract_increase_data(
-            name="业联-班组基础资料数据抽取",
-            logger_name="class_group",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sync_sql=read_sql(os.path.join("business_connection", "class_group", "sync", "class_group.sql")),
-            source_increase_sql=read_sql(os.path.join("business_connection", "class_group", "increase", "class_group_source.sql")),
-            target_table="class_group",
-            target_increase_sql=read_sql(os.path.join("business_connection", "class_group", "increase", "class_group_target.sql")),
-        )
-    )
-    task_e9 = extract_increase(
-        connect_data,
-        extract_increase_data(
-            name="业联-班组基础资料分录数据抽取",
-            logger_name="class_group_entry",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
-            source_sync_sql=read_sql(os.path.join("business_connection", "class_group_entry", "sync", "class_group_entry.sql")),
-            source_increase_sql=read_sql(os.path.join("business_connection", "class_group_entry", "increase", "class_group_entry_source.sql")),
-            target_table="class_group_entry",
-            target_increase_sql=read_sql(os.path.join("business_connection", "class_group_entry", "increase", "class_group_entry_target.sql")),
-        )
-    )
+    # task_e4 = extract_increase(
+    #     connect_data,
+    #     extract_increase_data(
+    #         name="业联-业务联系书数据抽取",
+    #         logger_name="business_connection",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sync_sql=read_sql(os.path.join("business_connection", "business_connection", "sync", "business_connection.sql")),
+    #         source_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_source.sql")),
+    #         target_table="business_connection",
+    #         target_increase_sql=read_sql(os.path.join("business_connection", "business_connection", "increase", "business_connection_target.sql")),
+    #     )
+    # )
+    # task_e5 = extract(
+    #     connect_data,
+    #     extract_data(
+    #         name="业联-业务联系书主送人数据抽取",
+    #         logger_name="business_connection_main_delivery_unit",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sql=read_sql(os.path.join("business_connection", "business_connection_main_delivery_unit.sql")),
+    #         target_table="business_connection_main_delivery_unit"
+    #     )
+    # )
+    # task_e6 = extract(
+    #     connect_data,
+    #     extract_data(
+    #         name="业联-业务联系书抄送人数据抽取",
+    #         logger_name="business_connection_copy_delivery_unit",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sql=read_sql(os.path.join("business_connection", "business_connection_copy_delivery_unit.sql")),
+    #         target_table="business_connection_copy_delivery_unit"
+    #     )
+    # )
+    # task_e7 = extract_increase(
+    #     connect_data,
+    #     extract_increase_data(
+    #         name="业联-业联执行关闭数据抽取",
+    #         logger_name="business_connection_close",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sync_sql=read_sql(os.path.join("business_connection", "business_connection_close", "sync", "business_connection_close.sql")),
+    #         source_increase_sql=read_sql(os.path.join("business_connection", "business_connection_close", "increase", "business_connection_close_source.sql")),
+    #         target_table="business_connection_close",
+    #         target_increase_sql=read_sql(os.path.join("business_connection", "business_connection_close", "increase", "business_connection_close_target.sql")),
+    #     )
+    # )
+    # task_e8 = extract_increase(
+    #     connect_data,
+    #     extract_increase_data(
+    #         name="业联-班组基础资料数据抽取",
+    #         logger_name="class_group",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sync_sql=read_sql(os.path.join("business_connection", "class_group", "sync", "class_group.sql")),
+    #         source_increase_sql=read_sql(os.path.join("business_connection", "class_group", "increase", "class_group_source.sql")),
+    #         target_table="class_group",
+    #         target_increase_sql=read_sql(os.path.join("business_connection", "class_group", "increase", "class_group_target.sql")),
+    #     )
+    # )
+    # task_e9 = extract_increase(
+    #     connect_data,
+    #     extract_increase_data(
+    #         name="业联-班组基础资料分录数据抽取",
+    #         logger_name="class_group_entry",
+    #         source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+    #         source_sync_sql=read_sql(os.path.join("business_connection", "class_group_entry", "sync", "class_group_entry.sql")),
+    #         source_increase_sql=read_sql(os.path.join("business_connection", "class_group_entry", "increase", "class_group_entry_source.sql")),
+    #         target_table="class_group_entry",
+    #         target_increase_sql=read_sql(os.path.join("business_connection", "class_group_entry", "increase", "class_group_entry_target.sql")),
+    #     )
+    # )
     
     
     
     task_p0 = ameliorate(connect_data)
     task_p0.dp(task_e0).dp(task_e1)
     
-    tasks_group = []
-    tasks_group.append(task_e0)
-    tasks_group.append(task_e1)
-    tasks_group.append(task_e2)
-    tasks_group.append(task_e3)
-    tasks_group.append(task_e4)
-    tasks_group.append(task_e5)
-    tasks_group.append(task_e6)
-    tasks_group.append(task_e7)
-    tasks_group.append(task_e8)
-    tasks_group.append(task_e9)
-    
-    tasks_group.append(task_p0)
-    
+    tasks_group = [
+        task_e0,
+        task_e1,
+        task_e2,
+        task_e3,
+        # task_e4,
+        # task_e5,
+        # task_e6,
+        # task_e7,
+        # task_e8,
+        # task_e9,
+        
+        task_p0
+    ]    
     return tasks_group
