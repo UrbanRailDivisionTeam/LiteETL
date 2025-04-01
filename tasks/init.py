@@ -136,13 +136,183 @@ def task_init(connect_data: connect_data) -> list[task]:
             target_increase_sql=read_sql(os.path.join("business_connection", "class_group_entry", "increase", "class_group_entry_target.sql")),
         )
     )
+    task_e10 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更单数据抽取",
+            logger_name="design_change",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change", "sync", "design_change.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change", "increase", "design_change_source.sql")),
+            target_table="design_change",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change", "increase", "design_change_target.sql")),
+        )
+    )
+    task_e11 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更单分录数据抽取",
+            logger_name="design_change_entry",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_entry", "sync", "design_change_entry.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_entry", "increase", "design_change_entry_source.sql")),
+            target_table="design_change_entry",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_entry", "increase", "design_change_entry_target.sql")),
+        )
+    )
+    task_e12 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行数据抽取",
+            logger_name="design_change_execution",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution", "sync", "design_change_execution.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution", "increase", "design_change_execution_source.sql")),
+            target_table="design_change_execution",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution", "increase", "design_change_execution_target.sql")),
+        )
+    )
+    task_e13 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行审核数据抽取",
+            logger_name="design_change_execution_audit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_audit", "sync", "design_change_execution_audit.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_audit", "increase", "design_change_execution_audit_source.sql")),
+            target_table="design_change_execution_audit",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_audit", "increase", "design_change_execution_audit_target.sql")),
+        )
+    )
+    task_e15 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行变更内容数据抽取",
+            logger_name="design_change_execution_change_content",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_change_content", "sync", "design_change_execution_change_content.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_change_content", "increase", "design_change_execution_change_content_source.sql")),
+            target_table="design_change_execution_change_content",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_change_content", "increase", "design_change_execution_change_content_target.sql")),
+        )
+    )
+    task_e16 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行文档变更数据抽取",
+            logger_name="design_change_execution_document_change",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_document_change", "sync", "design_change_execution_document_change.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_document_change", "increase", "design_change_execution_document_change_source.sql")),
+            target_table="design_change_execution_document_change",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_document_change", "increase", "design_change_execution_document_change_target.sql")),
+        )
+    )
+    task_e17 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行经办人数据抽取",
+            logger_name="design_change_execution_handle",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_handle", "sync", "design_change_execution_handle.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_handle", "increase", "design_change_execution_handle_source.sql")),
+            target_table="design_change_execution_handle",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_handle", "increase", "design_change_execution_handle_target.sql")),
+        )
+    )
+    task_e18 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行物料变更数据抽取",
+            logger_name="design_change_execution_material_change",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_change", "sync", "design_change_execution_material_change.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_change", "increase", "design_change_execution_material_change_source.sql")),
+            target_table="design_change_execution_material_change",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_change", "increase", "design_change_execution_material_change_target.sql")),
+        )
+    )
+    task_e19 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行备料工艺数据抽取",
+            logger_name="design_change_execution_material_preparation_technology",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_preparation_technology", "sync", "design_change_execution_material_preparation_technology.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_preparation_technology", "increase", "design_change_execution_material_preparation_technology_source.sql")),
+            target_table="design_change_execution_material_preparation_technology",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_preparation_technology", "increase", "design_change_execution_material_preparation_technology_target.sql")),
+        )
+    )
+    task_e20 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-设计变更执行返工工艺数据抽取",
+            logger_name="design_change_execution_reworked_material",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "design_change_execution_reworked_material", "sync", "design_change_execution_reworked_material.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_reworked_material", "increase", "design_change_execution_reworked_material_source.sql")),
+            target_table="design_change_execution_reworked_material",
+            target_increase_sql=read_sql(os.path.join("business_connection", "design_change_execution_reworked_material", "increase", "design_change_execution_reworked_material_target.sql")),
+        )
+    )
+    task_e21 = extract(
+        connect_data,
+        extract_data(
+            name="业联-设计变更执行抄送人数据抽取",
+            logger_name="design_change_execution_copy_delivery_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "design_change_execution_copy_delivery_unit.sql")),
+            target_table="design_change_execution_copy_delivery_unit"
+        )
+    )
+    task_e22 = extract(
+        connect_data,
+        extract_data(
+            name="业联-设计变更执行文档变更分录数据抽取",
+            logger_name="design_change_execution_document_change_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "design_change_execution_document_change_unit.sql")),
+            target_table="design_change_execution_document_change_unit"
+        )
+    )
+    task_e23 = extract(
+        connect_data,
+        extract_data(
+            name="业联-设计变更执行主送人数据抽取",
+            logger_name="design_change_execution_main_delivery_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "design_change_execution_main_delivery_unit.sql")),
+            target_table="design_change_execution_main_delivery_unit"
+        )
+    )
+    task_e24 = extract(
+        connect_data,
+        extract_data(
+            name="业联-设计变更执行备料工艺分录数据抽取",
+            logger_name="design_change_execution_material_preparation_technology_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "design_change_execution_material_preparation_technology_unit.sql")),
+            target_table="design_change_execution_material_preparation_technology_unit"
+        )
+    )
+    task_e14 = extract(
+        connect_data,
+        extract_data(
+            name="业联-设计变更执行返工工艺分录数据抽取",
+            logger_name="design_change_execution_reworked_material_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "design_change_execution_reworked_material_unit.sql")),
+            target_table="design_change_execution_reworked_material_unit"
+        )
+    )
     
     
     
     task_p0 = ameliorate(connect_data)
     task_p0.dp(task_e0).dp(task_e1)
     
-    tasks_group = [
+    return [
         task_e0,
         task_e1,
         task_e2,
@@ -153,7 +323,21 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e7,
         task_e8,
         task_e9,
+        task_e10,
+        task_e11,
+        task_e12,
+        task_e13,
+        task_e14,
+        task_e15,
+        task_e16,
+        task_e17,
+        task_e18,
+        task_e19,
+        task_e20,
+        task_e21,
+        task_e22,
+        task_e23,
+        task_e24,
         
         task_p0
-    ]    
-    return tasks_group
+    ]

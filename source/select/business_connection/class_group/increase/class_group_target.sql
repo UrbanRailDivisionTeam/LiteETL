@@ -1,5 +1,5 @@
 SELECT
-       bill."id",
-       bill."修改时间"
+    bill."id",
+    bill."修改时间"
 FROM
-       ods.class_group
+    ods.class_group bill

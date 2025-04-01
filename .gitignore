@@ -8,3 +8,5 @@ __pypackages__/
 uv.lock
 source/*.db
 source/*.wal
+
+*.zip

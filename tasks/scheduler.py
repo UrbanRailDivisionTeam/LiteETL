@@ -41,6 +41,7 @@ class scheduler:
         return True
     
     def run(self, input_tasks: list['task']) -> None:
+        self.log.info("调度器开始执行")
         self.task_list = input_tasks
         while True:
             for _task in self.task_list:
