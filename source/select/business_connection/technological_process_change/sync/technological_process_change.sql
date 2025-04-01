@@ -1,7 +1,7 @@
 SELECT
     bill.FEntryId AS "id",
     bill.fid AS "单据头id",
-    bill_m.fmodifytime AS "修改时间"
+    bill_m.fmodifytime AS "修改时间",
     bill.fk_crrc_blmaterialnum AS "所属零部件编号",
     bill.fk_crrc_pversion AS "父版本",
     bill.fk_crrc_blmaterialname AS "所属零部件名称",
