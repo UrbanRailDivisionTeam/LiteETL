@@ -3,6 +3,7 @@ from utils.connect import make_coonect
 from tasks.scheduler import scheduler
 from tasks.init import task_init
 
+
 if __name__ == "__main__":
     while True:
         try:
