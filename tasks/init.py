@@ -306,6 +306,42 @@ def task_init(connect_data: connect_data) -> list[task]:
             target_table="design_change_execution_reworked_material_unit"
         )
     )
+    task_e25 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-工艺流程数据抽取",
+            logger_name="technological_process",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "technological_process", "sync", "technological_process.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "technological_process", "increase", "technological_process_source.sql")),
+            target_table="technological_process",
+            target_increase_sql=read_sql(os.path.join("business_connection", "technological_process", "increase", "technological_process_target.sql")),
+        )
+    )
+    task_e26 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-工艺流程工艺变更数据抽取",
+            logger_name="technological_process_change",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "technological_process_change", "sync", "technological_process_change.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "technological_process_change", "increase", "technological_process_change_source.sql")),
+            target_table="technological_process_change",
+            target_increase_sql=read_sql(os.path.join("business_connection", "technological_process_change", "increase", "technological_process_change_target.sql")),
+        )
+    )
+    task_e27 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-工艺流程任务流程数据抽取",
+            logger_name="technological_process_flow",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "technological_process_flow", "sync", "technological_process_flow.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "technological_process_flow", "increase", "technological_process_flow_source.sql")),
+            target_table="technological_process_flow",
+            target_increase_sql=read_sql(os.path.join("business_connection", "technological_process_flow", "increase", "technological_process_flow_target.sql")),
+        )
+    )
     
     
     
@@ -338,6 +374,9 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e22,
         task_e23,
         task_e24,
+        task_e25,
+        task_e26,
+        task_e27,
         
         task_p0
     ]
