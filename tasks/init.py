@@ -474,6 +474,18 @@ def task_init(connect_data: connect_data) -> list[task]:
             target_table="shop_exeecution_material_preparation_technology_unit_process"
         )
     )
+    task_e40 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="线上工时数据抽取",
+            logger_name="online_worktime",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("worktime", "online_worktime", "sync", "online_worktime.sql")),
+            source_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_source.sql")),
+            target_table="online_worktime",
+            target_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_target.sql")),
+        )
+    )
     
     
     
@@ -521,6 +533,7 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e37,
         task_e38,
         task_e39,
+        task_e40,
         
         task_p0
     ]

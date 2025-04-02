@@ -1,4 +1,5 @@
 SELECT
+    r.FID as "id",
     p.fnumber AS "项目",
     t.fnumber AS "跟踪号",
     jch.fnumber AS "节车号",
@@ -7,8 +8,8 @@ SELECT
     r.FBIZDATE AS "时间",
     s.fnumber AS "人员",
     s.fname_l2 AS "人员名称",
-    SUM(rt.cfworkTimeHS) AS "工时",
-    SUM(rt.CFreplenishTime) AS "补报工时"
+    rt.cfworkTimeHS AS "工时",
+    rt.CFreplenishTime AS "补报工时"
 FROM
     ZJEAS7.T_MM_CompletionReport r
     LEFT JOIN ZJEAS7.T_MM_CompletionRAT rt ON r.fid = rt.fparentid
@@ -29,21 +30,3 @@ WHERE
             AND rt.CFreplenishTime is not null
         )
     )
-GROUP BY
-    r.FBIZDATE,
-    p.fnumber,
-    t.fnumber,
-    jch.fnumber,
-    o.fnumber,
-    o.fname_l2,
-    s.fnumber,
-    s.fname_l2
-ORDER BY
-    r.FBIZDATE,
-    p.fnumber,
-    t.fnumber,
-    jch.fnumber,
-    o.fnumber,
-    o.fname_l2,
-    s.fnumber,
-    s.fname_l2
