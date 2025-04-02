@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tasks.base import task
 
-class scheduler:
+class executer:
     def __init__(self, _duckdb: duckdb.DuckDBPyConnection) -> None:
         self.task_list: list['task'] = []
-        self.log = make_logger(_duckdb, "ETL负载调度器", "etl_scheduler")
+        self.log = make_logger(_duckdb, "ETL负载执行器", "etl_executer")
         num = self.get_cpu_count()
         self.log.info(f"线程池线程数为{str(num)}")
         self.tpool = ThreadPoolExecutor(max_workers=num)
@@ -39,10 +39,20 @@ class scheduler:
             if not _tasks.end_run:
                 return False
         return True
+
+    def check(self) -> None:
+        # 检查对应的任务是否符合要求
+        temp_name = set()
+        for task in self.task_list:
+            if task.name not in temp_name:
+                temp_name.add(task.name)
+            else:
+                raise ValueError("有重复的任务名称，请检查任务初始化")
     
     def run(self, input_tasks: list['task']) -> None:
         self.log.info("调度器开始执行")
         self.task_list = input_tasks
+        self.check()
         while True:
             for _task in self.task_list:
                 if self.can_start(_task):

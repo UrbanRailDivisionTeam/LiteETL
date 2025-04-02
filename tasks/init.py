@@ -342,6 +342,138 @@ def task_init(connect_data: connect_data) -> list[task]:
             target_increase_sql=read_sql(os.path.join("business_connection", "technological_process_flow", "increase", "technological_process_flow_target.sql")),
         )
     )
+    task_e28 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单数据抽取",
+            logger_name="shop_execution",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_execution", "sync", "shop_execution.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_execution", "increase", "shop_execution_source.sql")),
+            target_table="shop_execution",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_execution", "increase", "shop_execution_target.sql")),
+        )
+    )
+    task_e29 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单审核人数据抽取",
+            logger_name="shop_execution_audit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_execution_audit", "sync", "shop_execution_audit.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_audit", "increase", "shop_execution_audit_source.sql")),
+            target_table="shop_execution_audit",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_audit", "increase", "shop_execution_audit_target.sql")),
+        )
+    )
+    task_e30 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单经办人数据抽取",
+            logger_name="shop_execution_handle",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_execution_handle", "sync", "shop_execution_handle.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_handle", "increase", "shop_execution_handle_source.sql")),
+            target_table="shop_execution_handle",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_handle", "increase", "shop_execution_handle_target.sql")),
+        )
+    )
+    task_e31 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单返工工艺数据抽取",
+            logger_name="shop_execution_reworked_material",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_execution_reworked_material", "sync", "shop_execution_reworked_material.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_reworked_material", "increase", "shop_execution_reworked_material_source.sql")),
+            target_table="shop_execution_reworked_material",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_reworked_material", "increase", "shop_execution_reworked_material_target.sql")),
+        )
+    )
+    task_e32 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单任务项点数据抽取",
+            logger_name="shop_execution_task_item_point",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_execution_task_item_point", "sync", "shop_execution_task_item_point.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_task_item_point", "increase", "shop_execution_task_item_point_source.sql")),
+            target_table="shop_execution_task_item_point",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_execution_task_item_point", "increase", "shop_execution_task_item_point_target.sql")),
+        )
+    )
+    task_e33 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="业联-车间执行单备料工艺数据抽取",
+            logger_name="shop_exeecution_material_preparation_technology",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("business_connection", "shop_exeecution_material_preparation_technology", "sync", "shop_exeecution_material_preparation_technology.sql")),
+            source_increase_sql=read_sql(os.path.join("business_connection", "shop_exeecution_material_preparation_technology", "increase", "shop_exeecution_material_preparation_technology_source.sql")),
+            target_table="shop_exeecution_material_preparation_technology",
+            target_increase_sql=read_sql(os.path.join("business_connection", "shop_exeecution_material_preparation_technology", "increase", "shop_exeecution_material_preparation_technology_target.sql")),
+        )
+    )
+    task_e34 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单抄送人分录数据抽取",
+            logger_name="shop_execution_copy_delivery_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_execution_copy_delivery_unit.sql")),
+            target_table="shop_execution_copy_delivery_unit"
+        )
+    )
+    task_e35 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单主送人分录数据抽取",
+            logger_name="shop_execution_main_delivery_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_execution_main_delivery_unit.sql")),
+            target_table="shop_execution_main_delivery_unit"
+        )
+    )
+    task_e36 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单返工工艺分录数据抽取",
+            logger_name="shop_execution_reworked_material_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_execution_reworked_material_unit.sql")),
+            target_table="shop_execution_reworked_material_unit"
+        )
+    )
+    task_e37 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单任务项点分录数据抽取",
+            logger_name="shop_execution_task_item_point_unit",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_execution_task_item_point_unit.sql")),
+            target_table="shop_execution_task_item_point_unit"
+        )
+    )
+    task_e38 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单返工工艺班组分录数据抽取",
+            logger_name="shop_exeecution_material_preparation_technology_unit_class",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_exeecution_material_preparation_technology_unit_class.sql")),
+            target_table="shop_exeecution_material_preparation_technology_unit_class"
+        )
+    )
+    task_e39 = extract(
+        connect_data,
+        extract_data(
+            name="业联-车间执行单返工工艺处理分录数据抽取",
+            logger_name="shop_exeecution_material_preparation_technology_unit_process",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sql=read_sql(os.path.join("business_connection", "shop_exeecution_material_preparation_technology_unit_process.sql")),
+            target_table="shop_exeecution_material_preparation_technology_unit_process"
+        )
+    )
     
     
     
@@ -377,6 +509,18 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e25,
         task_e26,
         task_e27,
+        task_e28,
+        task_e29,
+        task_e30,
+        task_e31,
+        task_e32,
+        task_e33,
+        task_e34,
+        task_e35,
+        task_e36,
+        task_e37,
+        task_e38,
+        task_e39,
         
         task_p0
     ]
