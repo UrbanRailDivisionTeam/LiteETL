@@ -19,14 +19,4 @@ FROM
     LEFT JOIN ZJEAS7.T_MM_Operation o ON o.fid = r.cfoperationid
     LEFT JOIN ZJEAS7.t_bd_person s ON s.fid = rt.FPERSONNUMBERID
 WHERE
-    rt.FPERSONNUMBERID is not null
-    AND (
-        (
-            rt.cfworkTimeHS is not null
-            AND rt.cfworkTimeHS <> 0
-        )
-        or (
-            rt.CFreplenishTime <> 0
-            AND rt.CFreplenishTime is not null
-        )
-    )
+    rt.FPERSONNUMBERID is not null AND r.FBIZDATE >= ADD_MONTHS(SYSDATE, -24)

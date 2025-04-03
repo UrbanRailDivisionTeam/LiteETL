@@ -2,11 +2,8 @@ import os
 import time
 import duckdb
 from concurrent.futures import ThreadPoolExecutor
+from tasks.base import task, extract_increase, extract
 from utils.logger import make_logger
-
-from typing import TYPE_CHECKING
-if TYPE_CHECKING:
-    from tasks.base import task, extract_increase, extract
 
 
 class executer:
@@ -21,7 +18,7 @@ class executer:
     def stop(self) -> None:
         self.tpool.shutdown(wait=False, cancel_futures=True)
 
-    def can_start(self, input_task: 'task') -> bool:
+    def can_start(self, input_task: task) -> bool:
         # 没有依赖可以直接运行
         if len(input_task.depend) == 0:
             return True
@@ -58,7 +55,7 @@ class executer:
                 else:
                     raise ValueError(f"对于抽取任务,有重复的目标表名称{task.data.target_table}，请检查任务定义信息")
 
-    def run(self, input_tasks: list['task']) -> None:
+    def run(self, input_tasks: list[task]) -> None:
         self.log.info("开始进行任务检查")
         self.task_list = input_tasks
         self.check()

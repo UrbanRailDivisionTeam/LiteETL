@@ -238,6 +238,7 @@ class load_increase_data:
     target_table: str
     target_db: str
     target_increase_sql: str
+    is_del: bool = True
 
 
 class load_increase(task):
@@ -275,13 +276,22 @@ class load_increase(task):
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)}，转换为全量同步")
             return self.trans_sync()
         else:
-            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            if self.data.is_del:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            else:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
         # 删除目标表中需要删除的和需要变更的
-        if len(del_diff) + len(change_diff) > 0:
-            ids_to_delete = del_diff + change_diff
-            delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
-            self.target.execute(delete_statement)
-            self.target.commit()
+        if self.data.is_del:
+            if len(del_diff) + len(change_diff) > 0:
+                ids_to_delete = del_diff + change_diff
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+                self.target.execute(delete_statement)
+                self.target.commit()
+        else:
+            if len(change_diff) > 0:
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
+                self.target.execute(delete_statement)
+                self.target.commit()
         # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
@@ -301,6 +311,7 @@ class extract_increase_data:
     source_increase_sql: str
     target_table: str
     target_increase_sql: str
+    is_del: bool = True
 
 
 class extract_increase(task):
@@ -330,11 +341,18 @@ class extract_increase(task):
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
         else:
-            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            if self.data.is_del:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            else:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
         # 删除目标表中需要删除的和需要变更的
-        if len(del_diff) + len(change_diff) > 0:
-            ids_to_delete = del_diff + change_diff
-            self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+        if self.data.is_del:
+            if len(del_diff) + len(change_diff) > 0:
+                ids_to_delete = del_diff + change_diff
+                self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+        else:
+            if len(change_diff) > 0:
+                self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
         # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
@@ -361,6 +379,7 @@ class sync_increase_data:
     target_db: str
     target_table: str
     target_increase_sql: str
+    is_del: bool = True
 
 
 class sync_increase(task):
@@ -399,13 +418,22 @@ class sync_increase(task):
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
         else:
-            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            if self.data.is_del:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            else:
+                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
         # 删除目标表中需要删除的和需要变更的
-        if len(del_diff) + len(change_diff) > 0:
-            ids_to_delete = del_diff + change_diff
-            delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
-            self.target.execute(delete_statement)
-            self.target.commit()
+        if self.data.is_del:
+            if len(del_diff) + len(change_diff) > 0:
+                ids_to_delete = del_diff + change_diff
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+                self.target.execute(delete_statement)
+                self.target.commit()
+        else:
+            if len(change_diff) > 0:
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
+                self.target.execute(delete_statement)
+                self.target.commit() 
         # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff

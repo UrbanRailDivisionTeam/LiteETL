@@ -1,5 +1,5 @@
 select
-    re.FEntryId as "id",
+    re_e1.FEntryId as "id",
     re.FBILLNO as "单据编号",
     re.FMODIFYTIME as "修改时间",
     tsu.FTRUENAME as "创建人",

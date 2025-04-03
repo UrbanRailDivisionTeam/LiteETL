@@ -1,5 +1,5 @@
 select
-    re.FEntryId as "id",
+    re_e1.FEntryId as "id",
     re.FMODIFYTIME as "修改时间"
 from
     crrc_secd.tk_crrc_wire_number_re_e1 re_e1

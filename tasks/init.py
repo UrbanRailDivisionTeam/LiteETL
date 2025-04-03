@@ -3,6 +3,7 @@ from utils.config import CONFIG, DEBUG
 from utils.connect import connect_data
 from tasks.base import task, extract_increase, extract_increase_data, extract, extract_data
 from tasks.process.ameliorate import ameliorate
+from tasks.process.wire_number import wire_number
 
 
 def read_sql(sql_path: str) -> str:
@@ -484,6 +485,7 @@ def task_init(connect_data: connect_data) -> list[task]:
             source_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_source.sql")),
             target_table="online_worktime",
             target_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_target.sql")),
+            is_del=False
         )
     )
     task_e41 = extract_increase(
@@ -491,7 +493,7 @@ def task_init(connect_data: connect_data) -> list[task]:
         extract_increase_data(
             name="临时工时数据抽取",
             logger_name="temp_worktime",
-            source="生产辅助系统" if not DEBUG else "sqlserver服务",
+            source="生产辅助系统-城轨" if not DEBUG else "sqlserver服务",
             source_sync_sql=read_sql(os.path.join("worktime", "temp_worktime", "sync", "temp_worktime.sql")),
             source_increase_sql=read_sql(os.path.join("worktime", "temp_worktime", "increase", "temp_worktime_source.sql")),
             target_table="temp_worktime",
@@ -527,6 +529,9 @@ def task_init(connect_data: connect_data) -> list[task]:
     
     task_p0 = ameliorate(connect_data)
     task_p0.dp(task_e0).dp(task_e1)
+    
+    task_p1 = wire_number(connect_data)
+    task_p1.dp(task_e42).dp(task_e43)
     
     return [
         task_e0,
@@ -574,5 +579,6 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e42,
         task_e43,
         
-        task_p0
+        task_p0,
+        task_p1
     ]
