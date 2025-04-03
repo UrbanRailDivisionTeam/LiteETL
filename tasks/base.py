@@ -296,7 +296,7 @@ class load_increase(task):
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            increase_df: pd.DataFrame = self.source.sql(f"SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})").fetchdf()
+            increase_df: pd.DataFrame = self.source.sql(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""").fetchdf()
             # 因为前文已经检查过目标表的结构了，一般情况下可以成功插入
             increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
         self.log.debug("已成功完成该主表的增量同步")
@@ -357,7 +357,11 @@ class extract_increase(task):
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})")
+            # 为了解决oracle数据库兼容问题
+            if self.source.dialect.name == "oracle":
+                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery."id" in ({in_clause})""")
+            else:
+                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
             increase_df = pd.read_sql(select_statement, self.source)
             try:
                 self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM increase_df")
@@ -438,7 +442,11 @@ class sync_increase(task):
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            select_statement = text(f"SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})")
+            # 为了解决oracle数据库兼容问题
+            if self.source.dialect.name == "oracle":
+                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery."id" in ({in_clause})""")
+            else:
+                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
             increase_df = pd.read_sql(select_statement, self.source)
             try:
                 increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
