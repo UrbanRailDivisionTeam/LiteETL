@@ -1,5 +1,5 @@
 SELECT
-    r.FID as "id",
+    r.FID as id,
     p.fnumber AS "项目",
     t.fnumber AS "跟踪号",
     jch.fnumber AS "节车号",

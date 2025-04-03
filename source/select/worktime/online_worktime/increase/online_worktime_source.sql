@@ -1,5 +1,5 @@
 SELECT
-    r.FID as "id",
+    r.FID as id,
     r.FBIZDATE AS "时间"
 FROM
     ZJEAS7.T_MM_CompletionReport r

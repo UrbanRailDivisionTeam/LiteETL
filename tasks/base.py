@@ -358,10 +358,7 @@ class extract_increase(task):
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
             # 为了解决oracle数据库兼容问题
-            if self.source.dialect.name == "oracle":
-                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery."id" in ({in_clause})""")
-            else:
-                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
+            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
             increase_df = pd.read_sql(select_statement, self.source)
             try:
                 self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM increase_df")
@@ -426,8 +423,8 @@ class sync_increase(task):
                 self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
             else:
                 self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
-        # 删除目标表中需要删除的和需要变更的
         if self.data.is_del:
+            # 删除目标表中需要删除的和需要变更的
             if len(del_diff) + len(change_diff) > 0:
                 ids_to_delete = del_diff + change_diff
                 delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
@@ -442,11 +439,7 @@ class sync_increase(task):
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
             in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            # 为了解决oracle数据库兼容问题
-            if self.source.dialect.name == "oracle":
-                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery."id" in ({in_clause})""")
-            else:
-                select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
+            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
             increase_df = pd.read_sql(select_statement, self.source)
             try:
                 increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
