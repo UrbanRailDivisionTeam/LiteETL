@@ -6,8 +6,7 @@ from utils.config import CONFIG
 
 class ameliorate(process):
     def __init__(self, connect: connect_data) -> None:
-        super().__init__(connect.duckdb, "全员型改善数据分析", "ameliorate_process")
-        self.mongo = connect.mongo
+        super().__init__(connect.duckdb, connect.mongo, "全员型改善数据分析", "ameliorate_process")
 
     def task_main(self) -> None:
         data_index = pd.read_csv(os.path.join(CONFIG.TABLE_PATH, "城轨事业部改善指标.csv"), encoding="utf-8")

@@ -479,11 +479,47 @@ def task_init(connect_data: connect_data) -> list[task]:
         extract_increase_data(
             name="线上工时数据抽取",
             logger_name="online_worktime",
-            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source="EAS" if not DEBUG else "oracle服务",
             source_sync_sql=read_sql(os.path.join("worktime", "online_worktime", "sync", "online_worktime.sql")),
             source_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_source.sql")),
             target_table="online_worktime",
             target_increase_sql=read_sql(os.path.join("worktime", "online_worktime", "increase", "online_worktime_target.sql")),
+        )
+    )
+    task_e41 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="临时工时数据抽取",
+            logger_name="temp_worktime",
+            source="生产辅助系统" if not DEBUG else "sqlserver服务",
+            source_sync_sql=read_sql(os.path.join("worktime", "temp_worktime", "sync", "temp_worktime.sql")),
+            source_increase_sql=read_sql(os.path.join("worktime", "temp_worktime", "increase", "temp_worktime_source.sql")),
+            target_table="temp_worktime",
+            target_increase_sql=read_sql(os.path.join("worktime", "temp_worktime", "increase", "temp_worktime_target.sql")),
+        )
+    )
+    task_e42 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="线号标签申请上下标数据抽取",
+            logger_name="wire_number_head",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("wire_number", "head", "sync", "wire_number_head.sql")),
+            source_increase_sql=read_sql(os.path.join("wire_number", "head", "increase", "wire_number_head_source.sql")),
+            target_table="wire_number_head",
+            target_increase_sql=read_sql(os.path.join("wire_number", "head", "increase", "wire_number_head_target.sql")),
+        )
+    )
+    task_e43 = extract_increase(
+        connect_data,
+        extract_increase_data(
+            name="线号标签申请位置号数据抽取",
+            logger_name="wire_number_entry",
+            source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+            source_sync_sql=read_sql(os.path.join("wire_number", "entry", "sync", "wire_number_entry.sql")),
+            source_increase_sql=read_sql(os.path.join("wire_number", "entry", "increase", "wire_number_entry_source.sql")),
+            target_table="wire_number_entry",
+            target_increase_sql=read_sql(os.path.join("wire_number", "entry", "increase", "wire_number_entry_target.sql")),
         )
     )
     
@@ -534,6 +570,9 @@ def task_init(connect_data: connect_data) -> list[task]:
         task_e38,
         task_e39,
         task_e40,
+        task_e41,
+        task_e42,
+        task_e43,
         
         task_p0
     ]
