@@ -8,6 +8,16 @@ SELECT
     bill.fk_crrc_combofield7 AS "是否签订过安全承诺书",
     bill.fk_crrc_integerfield AS "随行人数",
     bill.fk_crrc_combofield9 AS "是否为作业负责人",
+    CASE 
+        bill.fbillstatus
+        WHEN 'A'
+        THEN '暂存'
+        WHEN 'B'
+        THEN '已提交'
+        WHEN 'C'
+        THEN '已审核'
+        ELSE '未知'
+    END AS "单据状态", 
     bill.fk_crrc_combofield8 AS "作业状态",
     bill.fk_crrc_combofield1 AS "申请作业时间",
     bill.fk_crrc_datefield AS "计划开工日期",
