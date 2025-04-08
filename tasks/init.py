@@ -524,16 +524,14 @@ def task_init(connect_data: connect_data) -> list[task]:
             target_increase_sql=read_sql(os.path.join("wire_number", "entry", "increase", "wire_number_entry_target.sql")),
         )
     )
-    task_e44 = sync_increase(
+    task_e44 = extract_increase(
         connect_data,
-        sync_increase_data(
+        extract_increase_data(
             name="相关方审批数据同步",
             logger_name="interested_party_review",
             source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
             source_sync_sql=read_sql(os.path.join("interested_party", "interested_party_review", "sync", "interested_party_review.sql")),
             source_increase_sql=read_sql(os.path.join("interested_party", "interested_party_review", "increase", "interested_party_review_source.sql")),
-            target="数据运用平台-测试库" if not DEBUG else "mysql服务",
-            target_db="zj_data",
             target_table="interested_party_review",
             target_increase_sql=read_sql(os.path.join("interested_party", "interested_party_review", "increase", "interested_party_review_target.sql")),
         )
