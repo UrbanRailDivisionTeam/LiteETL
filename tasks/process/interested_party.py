@@ -7,4 +7,8 @@ class interested_party(process):
         super().__init__(connect.duckdb, connect.mongo, "相关方数据处理", "interested_party_process")
         
     def task_main(self) -> None:
-        ...
+        self.connect.sql(
+            f"""
+                SELECT COUNT(ip.id) FROM ods.interested_party ip
+            """
+        )
