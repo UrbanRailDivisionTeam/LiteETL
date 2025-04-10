@@ -1,6 +1,5 @@
 from tasks.process import process
 from utils.connect import connect_data
-from utils.config import CONFIG
 
 
 class interested_party(process):
@@ -74,11 +73,11 @@ class interested_party(process):
             """
         ).fetchdf()
         top_car_dict = {
-            "进入公司的相关方总人数":int(temp0["_count"][0]),
-            "本月进入车间人数":int(temp1["_count"][0]),
-            "今日进入车间人数":int(temp2["_count"][0]),
-            "当前在车间人数":int(temp3["_count"][0]),
-            "今日临时外出人数":int(temp4["_count"][0])
+            "进入公司的相关方总人数": int(temp0["_count"][0]),
+            "本月进入车间人数": int(temp1["_count"][0]),
+            "今日进入车间人数": int(temp2["_count"][0]),
+            "当前在车间人数": int(temp3["_count"][0]),
+            "今日临时外出人数": int(temp4["_count"][0])
         }
         temp5 = self.connect.sql(
             f"""
