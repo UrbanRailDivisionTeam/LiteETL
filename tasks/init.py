@@ -3,7 +3,8 @@ from utils import read_sql
 from utils.config import DEBUG
 from utils.connect import connect_data
 from tasks.base import task, extract_increase, extract_increase_data
-from tasks.sync import business_connection, interested_party, wire_number, ameliorate, work_time
+from tasks.sync import attendance, business_connection, interested_party, wire_number, ameliorate, work_time, error
+from tasks.process.error import error_process
     
 
 def task_init(connect_data: connect_data) -> list[task]:
@@ -12,6 +13,7 @@ def task_init(connect_data: connect_data) -> list[task]:
     wn_task_group = wire_number.init(connect_data)
     am_task_group = ameliorate.init(connect_data)
     wt_task_group = work_time.init(connect_data)
+    ci_task_group = attendance.init(connect_data)
 
     task_person = extract_increase(
         connect_data,
@@ -26,6 +28,9 @@ def task_init(connect_data: connect_data) -> list[task]:
         )
     )
 
+    error_process_ = error_process(connect_data)
+    error_process_.dp(ci_task_group["考勤节假日数据抽取"])
+
     am_task_group["相关方数据处理"].dp(task_person)
 
     res = [task_person]
@@ -34,5 +39,6 @@ def task_init(connect_data: connect_data) -> list[task]:
     res += list(wn_task_group.values())
     res += list(am_task_group.values())
     res += list(wt_task_group.values())
+    res += list(ci_task_group.values())
     return res
         

@@ -3,7 +3,7 @@ import pandas as pd
 from tasks.process import process
 from utils.connect import connect_data
 
-class wire_number(process):
+class wire_number_process(process):
     def __init__(self, connect: connect_data) -> None:
         super().__init__(connect.duckdb, connect.mongo, "线号标签申请数据处理", "wire_number_process")
         self.path = "\\\\172.18.1.60\\部室文件(新)\\总成车间（新）\\4.工位工作\\线号标签申请\\"

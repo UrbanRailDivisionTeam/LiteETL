@@ -4,7 +4,7 @@ from tasks.process import process
 from utils.connect import connect_data
 from utils.config import CONFIG
 
-class ameliorate(process):
+class ameliorate_process(process):
     def __init__(self, connect: connect_data) -> None:
         super().__init__(connect.duckdb, connect.mongo, "全员型改善数据分析", "ameliorate_process")
 

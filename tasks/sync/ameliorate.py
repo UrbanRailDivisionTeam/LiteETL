@@ -3,11 +3,13 @@ from utils import read_sql
 from utils.config import DEBUG
 from utils.connect import connect_data
 from tasks.base import task, extract_increase, extract_increase_data
-from tasks.process.ameliorate import ameliorate
+from tasks.sync import init_warpper
+from tasks.process.ameliorate import ameliorate_process
 
 
-def init(connect_data: connect_data) -> dict[str, task]:
-    task_group = [
+@init_warpper
+def init(connect_data: connect_data) -> list[task]:
+    return [
         extract_increase(
             connect_data,
             extract_increase_data(
@@ -20,11 +22,5 @@ def init(connect_data: connect_data) -> dict[str, task]:
                 target_increase_sql=read_sql(os.path.join("ameliorate", "increase", "ameliorate_target.sql")),
             )
         ),
-        ameliorate(connect_data)
+        ameliorate_process(connect_data)
     ]
-
-    keys = [ch.name for ch in task_group]
-    res: dict[str, task] = dict(zip(keys, task_group))
-
-    res["全员型改善数据分析"].dp(res["改善数据抽取"])
-    return res

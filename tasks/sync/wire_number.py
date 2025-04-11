@@ -2,12 +2,14 @@ import os
 from utils import read_sql
 from utils.config import DEBUG
 from utils.connect import connect_data
+from tasks.sync import init_warpper
 from tasks.base import task, extract_increase, extract_increase_data
-from tasks.process.wire_number import wire_number
+from tasks.process.wire_number import wire_number_process
 
 
-def init(connect_data: connect_data) -> dict[str, task]:
-    task_group = [
+@init_warpper
+def init(connect_data: connect_data) -> list[task]:
+    return [
         extract_increase(
             connect_data,
             extract_increase_data(
@@ -32,11 +34,5 @@ def init(connect_data: connect_data) -> dict[str, task]:
                 target_increase_sql=read_sql(os.path.join("wire_number", "entry", "increase", "wire_number_entry_target.sql")),
             )
         ),
-        wire_number(connect_data)
+        wire_number_process(connect_data)
     ]
-
-    keys = [ch.name for ch in task_group]
-    res: dict[str, task] = dict(zip(keys, task_group))
-    
-    res["线号标签申请数据处理"].dp(res["线号标签申请上下标数据抽取"]).dp(res["线号标签申请位置号数据抽取"])
-    return res

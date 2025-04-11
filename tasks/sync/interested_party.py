@@ -2,12 +2,14 @@ import os
 from utils import read_sql
 from utils.config import DEBUG
 from utils.connect import connect_data
+from tasks.sync import init_warpper
 from tasks.base import task, extract_increase, extract_increase_data
-from tasks.process.interested_party import interested_party
+from tasks.process.interested_party import interested_party_process
 
 
-def init(connect_data: connect_data) -> dict[str, task]:
-    task_group = [
+@init_warpper
+def init(connect_data: connect_data) -> list[task]:
+    return [
         extract_increase(
             connect_data,
             extract_increase_data(
@@ -44,10 +46,5 @@ def init(connect_data: connect_data) -> dict[str, task]:
                 target_increase_sql=read_sql(os.path.join("interested_party", "interested_party_review", "increase", "interested_party_review_target.sql")),
             )
         ),
-        interested_party(connect_data)
+        interested_party_process(connect_data)
     ]
-
-    keys = [ch.name for ch in task_group]
-    res: dict[str, task] = dict(zip(keys, task_group))
-    res["相关方数据处理"].dp(res["相关方审批数据同步"])
-    return res
