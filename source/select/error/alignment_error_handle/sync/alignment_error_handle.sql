@@ -4,7 +4,7 @@ select
     bill.fmodifytime as "修改时间",
     project_.fnumber as "项目号",
     project_.fname as "项目名称",
-    bill.fk_crrc_lcnum as "跟踪号",
+    bill.fk_crrc_lcnum as "列车号",
     bill.fk_crrc_jcnums as "校线节车号",
     bill.fk_crrc_discrib as "现象描述",
     gxx.fname as "构型项名称",

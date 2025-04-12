@@ -1,5 +1,6 @@
 import datetime
 import duckdb
+import pandas as pd
 from tasks.process import process
 from utils.connect import connect_data
 
@@ -64,33 +65,25 @@ def judje_time(
         input_time = input_time.replace(hour=pm_start.hour, minute=pm_start.minute, microsecond=0)
         return judje_time(input_time, cursor, holiday_table_name, work_time_index, request_time, commuting_time)
     # 在晚上下班后发起的异常，递归到第二天凌晨起始
-    if input_time > pm_end:
+    if input_time >= pm_end:
         input_time += datetime.timedelta(days=1)
         input_time = input_time.replace(hour=0, minute=0, second=0, microsecond=0)
         return judje_time(input_time, cursor, holiday_table_name, work_time_index, request_time, commuting_time)
     # 在上午上班时间发起的异常
     if input_time >= am_start and input_time < am_end:
         plan_respond = request_time - work_time_index
-        real_time = am_end - am_start
-        # 如果计划需要响应的时间大于上午上班时间
-        if plan_respond > real_time:
-            work_time_index += real_time
-            input_time += real_time
-        else:
-            work_time_index += plan_respond
-            input_time += plan_respond
+        real_time = am_end - max(am_start, input_time)
+        temp_dur = min(real_time, plan_respond)
+        work_time_index += temp_dur
+        input_time += temp_dur
         return judje_time(input_time, cursor, holiday_table_name, work_time_index, request_time, commuting_time)
     # 在下午午上班时间发起的异常
     if input_time >= pm_start and input_time < pm_end:
         plan_respond = request_time - work_time_index
-        real_time = pm_end - pm_start
-        # 如果计划需要响应的时间大于上午上班时间
-        if plan_respond > real_time:
-            work_time_index += real_time
-            input_time += real_time
-        else:
-            work_time_index += plan_respond
-            input_time += plan_respond
+        real_time = pm_end - max(pm_start, input_time)
+        temp_dur = min(real_time, plan_respond)
+        work_time_index += temp_dur
+        input_time += temp_dur
         return judje_time(input_time, cursor, holiday_table_name, work_time_index, request_time, commuting_time)
     raise ValueError(f"计算错误，程序不应当运行到这个位置，请检查程序和原始数据, {str(input_time)}, {str(work_time_index)}")
 
@@ -100,11 +93,96 @@ class alignment_error_process(process):
         super().__init__(connect.duckdb, connect.mongo, "校线异常数据处理", "error_process")
 
     def task_main(self) -> None:
+        def process(input_time: datetime.datetime) -> datetime.datetime:
+            real_time, _ = judje_time(
+                input_time=input_time,
+                cursor=self.connect,
+                holiday_table_name='attendance_kq_scheduling_holiday',
+                work_time_index=datetime.timedelta(),
+                request_time=datetime.timedelta(hours=2),
+                commuting_time=[
+                    datetime.timedelta(hours=8, minutes=30),
+                    datetime.timedelta(hours=12, minutes=00),
+                    datetime.timedelta(hours=13, minutes=30),
+                    datetime.timedelta(hours=17, minutes=30)
+                ]
+            )
+            return real_time
         temp0 = self.connect.sql(
             f'''
             SELECT
                 COUNT(bill."id")
             FROM ods.alignment_error_handle bill
-            WHERE bill.
+            WHERE 
+                bill."提报时间" >= CURRENT_DATE
+                AND bill."提报时间"  < CURRENT_DATE + INTERVAL '1' DAY
             '''
         ).fetchall()
+        temp1 = self.connect.sql(
+            f'''
+            SELECT
+                COUNT(bill."id")
+            FROM ods.alignment_error_handle bill
+            WHERE 
+                bill."提报时间" >= DATE_TRUNC('month', CURRENT_DATE)
+                AND bill."提报时间" < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1' MONTH
+            '''
+        ).fetchall()
+        temp2 = self.connect.sql(
+            f'''
+            SELECT
+                COUNT(bill."id")
+            FROM ods.alignment_error_handle bill
+            WHERE bill."单据状态" = '待响应' OR bill."单据状态" = '转交中'
+            '''
+        ).fetchall()
+        temp3 = self.connect.sql(
+            f'''
+            SELECT
+                COUNT(bill."id")
+            FROM ods.alignment_error_handle bill
+            WHERE bill."单据状态" = '已响应'
+            '''
+        ).fetchall()
+        total_process_handle: pd.DataFrame = self.connect.sql(f'''SELECT * FROM ods.alignment_error_handle''').fetchdf()
+        total_process_initiate: pd.DataFrame = self.connect.sql(f'''SELECT * FROM ods.alignment_error_initiate''').fetchdf()
+        total_process_handle["预计响应时间"] = total_process_handle.apply(lambda row: process(row["提报时间"]), axis=1)
+        total_process_handle["是否及时响应"] = total_process_handle.apply(lambda row: row["响应时间"] >= row["预计响应时间"], axis=1)
+        ...
+
+        total_process_handle_res = total_process_handle[["项目名称",  "列车号", "校线节车号", "构型项名称", "现象分类", "现象描述", "响应人姓名"]]
+        
+        temp4 = self.connect.sql(
+            f'''
+            SELECT
+                bill."所属班组",
+                CAES 
+                    WHEN COUNT(bill."id") = 0 
+                    THEN 0
+                    ELSE SUM(bill."是否及时响应") / COUNT(bill."id") 
+                END AS "及时响应率"
+            FROM total_process_handle_res bill
+            GROUP BY bill."所属班组"
+            '''
+        ).fetchdf()
+        temp5 = self.connect.sql(
+            f'''
+            SELECT
+                bill."项目号",
+                CAES 
+                    WHEN COUNT(bill2."校线节车号") = 0 
+                    THEN 0
+                    ELSE COUNT(bill."id")  / COUNT(bill2."校线节车号")
+                END AS "异常平均数统计"
+            FROM total_process_handle_res bill
+            LEFT JOIN (
+                SELECT 
+                    DISTINCT
+                    bill."项目号",
+                    bill."列车号",
+                    bill."校线节车号"
+                FROM total_process_handle_res bill
+            ) bill2 on bill2."项目号" = bill."项目号"
+            GROUP BY bill."项目号"
+            '''
+        ).fetchdf()
