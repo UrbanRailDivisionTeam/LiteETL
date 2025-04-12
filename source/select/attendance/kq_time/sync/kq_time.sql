@@ -1,9 +1,5 @@
 SELECT
-    CONCAT (
-        EmployeeID,
-        TypeID,
-        CONVERT(varchar(100), StatisticsDate, 0)
-    ) AS "id",
+    CONCAT (EmployeeID, TypeID) AS "id",
     EmployeeID AS "员工考勤系统id",
     StatisticsDate AS "调整时间",
     TypeID AS "考勤类型id",

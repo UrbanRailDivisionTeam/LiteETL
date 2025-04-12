@@ -1,6 +1,6 @@
 select
     bill.fid as "id",
-    bill.FMODIFYTIME as "修改时间",
+    bill.fmodifytime as "修改时间",
     case bill.fbillstatus
         when 'A' then '处理中'
         when 'B' then '诊断中'

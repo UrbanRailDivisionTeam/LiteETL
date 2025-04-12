@@ -1,6 +1,5 @@
 select
     bill.fid as "id",
-    bill.FMODIFYTIME as "修改时间",
     bill.fbillno as "单据编号",
     bill.fmodifytime as "修改时间",
     project_.fnumber as "项目号",

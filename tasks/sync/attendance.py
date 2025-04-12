@@ -37,7 +37,7 @@ def init(connect_data: connect_data) -> list[task]:
             connect_data,
             extract_data(
                 name="考勤类型数据抽取",
-                logger_name="kq_type",
+                logger_name="attendance_kq_type",
                 source="考勤系统" if not DEBUG else "oracle服务",
                 source_sql=read_sql(os.path.join("attendance", "kq_type.sql")),
                 target_table="attendance_kq_type"
