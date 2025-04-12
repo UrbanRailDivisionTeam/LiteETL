@@ -3,6 +3,14 @@ SELECT
     r.FBIZDATE AS "时间"
 FROM
     ZJEAS7.T_MM_CompletionReport r
-    LEFT JOIN ZJEAS7.T_MM_CompletionRAT rt ON r.fid = rt.fparentid
 WHERE
-    rt.FPERSONNUMBERID is not null AND r.FBIZDATE >= ADD_MONTHS(SYSDATE, -24)
+    EXISTS (
+        SELECT
+            1
+        FROM
+            ZJEAS7.T_MM_CompletionRAT rt
+        WHERE
+            rt.fparentid = r.fid
+            AND rt.FPERSONNUMBERID IS NOT NULL
+    )
+    AND r.FBIZDATE >= ADD_MONTHS (SYSDATE, -24)
