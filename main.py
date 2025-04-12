@@ -8,7 +8,8 @@ if __name__ == "__main__":
     while True:
         try:
             connect_data = make_coonect()
-            executer(connect_data.duckdb).run(task_init(connect_data))
+            runner = executer(connect_data.duckdb)
+            
         except Exception as e:
             print(f"主程序出错: {e}")
         print("运行完成，等待10分钟重新启动ETL负载")
