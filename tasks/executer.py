@@ -48,8 +48,6 @@ class executer:
                     self.tpool.submit(_task.run)
             if self.can_stop():
                 break
-            # 适当延时以防止频繁回收和检查
-            time.sleep(0.5)
             '''
             每次主线程循环检查时就执行一次垃圾回收，
             因为服务对于延迟不敏感，却有大数据集需要频繁加载到内存
@@ -58,6 +56,8 @@ class executer:
             因此应当尽可能执行垃圾回收，将剩余的内存交给duckdb来使用
             '''
             gc.collect()
+            # 适当延时以防止频繁回收和检查
+            time.sleep(0.5)
         self.log.info("调度器已执行完成")
 
     @staticmethod

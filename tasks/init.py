@@ -35,44 +35,24 @@ def check(task_list: list[dict[str, task]]) -> tuple[bool, str]:
 
 def task_init(connect_data: connect_data) -> list[task]:
     # 用于任务类的初始化
-    ameliorate_group = ameliorate.init(connect_data)
-    attendance_group = attendance.init(connect_data)
-    business_connection_group = business_connection.init(connect_data)
-    error_group = error.init(connect_data)
-    interested_party_group = interested_party.init(connect_data)
-    person_group = person.init(connect_data)
-    wire_number_group = wire_number.init(connect_data)
-    work_time_group = work_time.init(connect_data)
-    approval_flow_group = approval_flow.init(connect_data)
-
-    # 检查任务是否符合规范
     temp_res = [
-        ameliorate_group, 
-        attendance_group,
-        business_connection_group,
-        error_group,
-        interested_party_group,
-        person_group,
-        wire_number_group,
-        work_time_group,
-        approval_flow_group,
+        ameliorate.init(connect_data),
+        attendance.init(connect_data),
+        business_connection.init(connect_data),
+        error.init(connect_data),
+        interested_party.init(connect_data),
+        person.init(connect_data),
+        wire_number.init(connect_data),
+        work_time.init(connect_data),
+        approval_flow.init(connect_data),
     ]
+    # 检查任务是否符合规范
     label, label_str = check(temp_res)
     if not label:
         raise ValueError(label_str)
 
     # 将多个来源的初始化任务合并
-    gp = {
-        **ameliorate_group, 
-        **attendance_group,
-        **business_connection_group,
-        **error_group,
-        **interested_party_group,
-        **person_group,
-        **wire_number_group,
-        **work_time_group,
-        **approval_flow_group,
-    }
+    gp = {k: v for d in temp_res for k, v in d.items()}
     
     # 用于任务类相关关系定义
     gp["全员型改善数据分析"].dp(gp["改善数据抽取"]).dp(gp["人员基础数据抽取"])

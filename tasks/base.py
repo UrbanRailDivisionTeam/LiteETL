@@ -132,6 +132,11 @@ class sync(task):
         self.target.close()
 
 
+def chunk_list(lst: list[str], chunk_size: int = 1000) -> list[list[str]]:
+    '''切分列表为指定的长度'''
+    return [lst[i:i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+
 def get_diff(cursor: duckdb.DuckDBPyConnection, source_increase_df: pd.DataFrame, target_increase_df: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
     '''获取两个dataframe的不同'''
     if source_increase_df.columns.to_list() != target_increase_df.columns.to_list():
@@ -173,6 +178,7 @@ def get_diff(cursor: duckdb.DuckDBPyConnection, source_increase_df: pd.DataFrame
         change_diff = []
     return new_diff, del_diff, change_diff
 
+
 def get_database_type(conn: sqlalchemy.engine.Connection) -> str:
     '''根据sqlalchemy的连接获取数据库的类型'''
     dtype = conn.dialect.name
@@ -181,12 +187,13 @@ def get_database_type(conn: sqlalchemy.engine.Connection) -> str:
     elif dtype == "mysql":
         pass
     elif dtype == "oracle":
-        pass 
+        pass
     elif dtype == "mssql":
         dtype = "sqlserver"
     else:
         raise ValueError("不支持的数据库类型")
     return dtype
+
 
 def get_database_metadata(conn: sqlalchemy.engine.Connection, schema: str, table: str) -> pd.DataFrame:
     '''获取目标数据库目标表的元数据，用于监控数据库的结构变更'''
@@ -281,6 +288,7 @@ class load_increase(task):
         index = 0
         while True:
             # 注意这里全量同步的分片是根据duckdb内部的向量来的，是2048的倍数
+            # 这里因为是从duckdb中抽数据到其它系统，所以不需要考虑类型问题
             df: pd.DataFrame = self.source.sql(self.data.source_sync_sql).fetch_df_chunk()
             if df.empty:
                 break
@@ -294,6 +302,28 @@ class load_increase(task):
         meta_data = get_database_metadata(self.target, self.data.target_db, self.data.target_table)
         self.source.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")
         self.log.debug(f"已重建元数据")
+
+    def task_del(self, delete_list: list[str]) -> None:
+        '''删除目标表中需要删除的和需要变更的'''
+        del_len = len(delete_list)
+        if del_len > 0:
+            if del_len < CONFIG.MAX_WHERE_LIST:
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in delete_list])})")
+            else:
+                delete_table = chunk_list(delete_list, CONFIG.MAX_WHERE_LIST)
+                temp_where = "OR ".join([f"id IN ({','.join([f"\'{ch}\'" for ch in ch_list])})" for ch_list in delete_table])
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE {temp_where}")
+            self.target.execute(delete_statement)
+            self.target.commit()
+
+    def task_append(self, append_list: list[str]) -> None:
+        '''查询需要新增和需要变更的数据写入目标表'''
+        append_len = len(append_list)
+        if append_len > 0:
+            in_clause = ', '.join([f"\'{ch}\'" for ch in append_list])
+            increase_df: pd.DataFrame = self.source.sql(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""").fetchdf()
+            # 因为前文已经检查过目标表的结构了，一般情况下可以成功插入
+            increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
 
     def task_main(self) -> None:
         temp = self.source.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
@@ -313,30 +343,15 @@ class load_increase(task):
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)}，转换为全量同步")
             return self.trans_sync()
-        else:
-            if self.data.is_del:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
-            else:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
-        # 删除目标表中需要删除的和需要变更的
+
         if self.data.is_del:
-            if len(del_diff) + len(change_diff) > 0:
-                ids_to_delete = del_diff + change_diff
-                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
-                self.target.execute(delete_statement)
-                self.target.commit()
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            self.task_del(change_diff + del_diff)
         else:
-            if len(change_diff) > 0:
-                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
-                self.target.execute(delete_statement)
-                self.target.commit()
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
+            self.task_del(change_diff)
         # 查询需要新增和需要变更的数据写入目标表
-        if len(new_diff) + len(change_diff) > 0:
-            ids_to_select = new_diff + change_diff
-            in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            increase_df: pd.DataFrame = self.source.sql(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""").fetchdf()
-            # 因为前文已经检查过目标表的结构了，一般情况下可以成功插入
-            increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
+        self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
 
 
@@ -365,6 +380,36 @@ class extract_increase(task):
         self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
+    def task_del(self, delete_list: list[str]) -> None:
+        '''删除目标表中需要删除的和需要变更的'''
+        del_len = len(delete_list)
+        if del_len > 0:
+            if del_len < CONFIG.MAX_WHERE_LIST:
+                self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in delete_list])})")
+            else:
+                delete_table = chunk_list(delete_list, CONFIG.MAX_WHERE_LIST)
+                temp_where = "OR ".join([f"id IN ({','.join([f"\'{ch}\'" for ch in ch_list])})" for ch_list in delete_table])
+                self.target.execute(
+                    f"""
+                        DELETE FROM ods.{self.data.target_table} 
+                        WHERE {temp_where}
+                    """
+                )
+
+    def task_append(self, append_list: list[str]) -> None:
+        '''查询需要新增和需要变更的数据写入目标表'''
+        append_len = len(append_list)
+        if append_len > 0:
+            in_clause = ', '.join([f"\'{ch}\'" for ch in append_list])
+            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
+            increase_df = pd.read_sql(select_statement, self.source)
+            try:
+                self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM increase_df")
+            except Exception as e:
+                self.log.warning(e)
+                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
+                return self.trans_sync()
+
     def task_main(self) -> None:
         temp = self.target.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'ods' AND table_name = '{self.data.target_table}'").fetchall()
         if len(temp) == 0:
@@ -378,32 +423,13 @@ class extract_increase(task):
         if change_len >= CONFIG.MAX_INCREASE_CHANGE:
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
-        else:
-            if self.data.is_del:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
-            else:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
-        # 删除目标表中需要删除的和需要变更的
         if self.data.is_del:
-            if len(del_diff) + len(change_diff) > 0:
-                ids_to_delete = del_diff + change_diff
-                self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            self.task_del(del_diff + change_diff)
         else:
-            if len(change_diff) > 0:
-                self.target.execute(f"DELETE FROM ods.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
-        # 查询需要新增和需要变更的数据写入目标表
-        if len(new_diff) + len(change_diff) > 0:
-            ids_to_select = new_diff + change_diff
-            in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            # 为了解决oracle数据库兼容问题
-            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
-            increase_df = pd.read_sql(select_statement, self.source)
-            try:
-                self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM increase_df")
-            except Exception as e:
-                self.log.warning(e)
-                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
-                return self.trans_sync()
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
+            self.task_del(change_diff)
+        self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
 
 
@@ -438,6 +464,33 @@ class sync_increase(task):
         self.local.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")
         self.log.debug(f"已重建元数据")
 
+    def task_del(self, delete_list: list[str]) -> None:
+        '''删除目标表中需要删除的和需要变更的'''
+        del_len = len(delete_list)
+        if del_len > 0:
+            if del_len < CONFIG.MAX_WHERE_LIST:
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in delete_list])})")
+            else:
+                delete_table = chunk_list(delete_list, CONFIG.MAX_WHERE_LIST)
+                temp_where = "OR ".join([f"id IN ({','.join([f"\'{ch}\'" for ch in ch_list])})" for ch_list in delete_table])
+                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE {temp_where}")
+            self.target.execute(delete_statement)
+            self.target.commit()
+
+    def task_append(self, append_list: list[str]) -> None:
+        '''查询需要新增和需要变更的数据写入目标表'''
+        append_len = len(append_list)
+        if append_len > 0:
+            in_clause = ', '.join([f"\'{ch}\'" for ch in append_list])
+            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
+            increase_df = pd.read_sql(select_statement, self.source)
+            try:
+                increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
+            except Exception as e:
+                self.log.warning(e)
+                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
+                return self.trans_sync()
+
     def task_main(self) -> None:
         temp = self.local.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
         if len(temp) == 0:
@@ -456,33 +509,11 @@ class sync_increase(task):
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
             self.log.debug(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
-        else:
-            if self.data.is_del:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
-            else:
-                self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
         if self.data.is_del:
-            # 删除目标表中需要删除的和需要变更的
-            if len(del_diff) + len(change_diff) > 0:
-                ids_to_delete = del_diff + change_diff
-                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in ids_to_delete])})")
-                self.target.execute(delete_statement)
-                self.target.commit()
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行，删除{str(len(del_diff))}行")
+            self.task_del(change_diff + del_diff)
         else:
-            if len(change_diff) > 0:
-                delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
-                self.target.execute(delete_statement)
-                self.target.commit()
-        # 查询需要新增和需要变更的数据写入目标表
-        if len(new_diff) + len(change_diff) > 0:
-            ids_to_select = new_diff + change_diff
-            in_clause = ', '.join([f"\'{ch}\'" for ch in ids_to_select])
-            select_statement = text(f"""SELECT * FROM ({self.data.source_sync_sql}) subquery WHERE subquery.id in ({in_clause})""")
-            increase_df = pd.read_sql(select_statement, self.source)
-            try:
-                increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
-            except Exception as e:
-                self.log.warning(e)
-                self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
-                return self.trans_sync()
+            self.log.debug(f"本次同步新增{str(len(new_diff))}行，修改{str(len(change_diff))}行")
+            self.task_del(change_diff)
+        self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
