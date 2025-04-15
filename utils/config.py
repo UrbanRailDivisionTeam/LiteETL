@@ -25,12 +25,14 @@ class config:
     # 同步配置的间隔时长
     INTERVAL_DURATION: float = 5 * 60
     # 增量同步变更量最大值，新增的行数和修改的行数之和超过这个数，增量同步就退化为全量同步
-    MAX_INCREASE_CHANGE: int = 5000
+    # 注意，为了避免ora 01975 maxium number of expression in a list is 1000的问题，暂时要求最大大小不超过1000
+    MAX_INCREASE_CHANGE: int = 1000
+    MAX_SYNC_BATCHSIZE: int = 5000
     # 默认的批量大小
     DEFAULT_BATCH_SIZE = 100000
 
 
-DEBUG = True
+DEBUG = False
 if DEBUG:
     CONFIG = config(
         MONGO_IP = "172.24.97.186",

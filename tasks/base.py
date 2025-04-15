@@ -161,16 +161,16 @@ def get_diff(cursor: duckdb.DuckDBPyConnection, source_increase_df: pd.DataFrame
             [
                 f"""
                     CASE 
-                        WHEN s.{col} IS NULL AND t.{col} IS NULL THEN false
-                        WHEN s.{col} IS NULL OR t.{col} IS NULL THEN true
-                        WHEN s.{col} != t.{col} THEN true
+                        WHEN s."{col}" IS NULL AND t."{col}" IS NULL THEN false
+                        WHEN s."{col}" IS NULL OR t."{col}" IS NULL THEN true
+                        WHEN s."{col}" != t."{col}" THEN true
                         ELSE false
-                    END AS {col}_diff
+                    END AS "{col}_diff"
                 """
                 for col in columns_to_check
             ]
         )
-        diff_columns_name = ', '.join([f"{col}_diff" for col in columns_to_check])
+        diff_columns_name = ', '.join([f"\"{col}_diff\"" for col in columns_to_check])
         change_diff = cursor.sql(
             f'''
                 WITH 
@@ -289,8 +289,19 @@ class load_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        df: pd.DataFrame = self.source.sql(self.data.source_sync_sql).fetchdf()
-        index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
+        first_label = True
+        index = 0
+        while True:
+            # 注意这里全量同步的分片是根据duckdb内部的向量来的，是2048的倍数
+            df: pd.DataFrame = self.source.sql(self.data.source_sync_sql).fetch_df_chunk()
+            if df.empty:
+                break
+            if first_label:
+                temp_index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
+                first_label = False
+            else:
+                temp_index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
+            index += temp_index if temp_index is not None else 0
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
         meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
         self.source.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")
@@ -362,8 +373,14 @@ class extract_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        temp_df = pd.read_sql(self.data.source_sync_sql, self.source)
-        self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM temp_df")
+        first_label = True
+        temp_df = pd.read_sql(self.data.source_sync_sql, self.source, chunksize=CONFIG.MAX_SYNC_BATCHSIZE)
+        for ch_df in temp_df:
+            if first_label:
+                self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM ch_df")
+                first_label = False
+            else:
+                self.target.execute(f"INSERT INTO ods.{self.data.target_table} SELECT * FROM ch_df")
         self.log.debug(f"全量抽取已完成")
 
     def task_main(self) -> None:
@@ -376,7 +393,7 @@ class extract_increase(task):
         new_diff, del_diff, change_diff = get_diff(self.target, source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
-        if change_len > CONFIG.MAX_INCREASE_CHANGE:
+        if change_len >= CONFIG.MAX_INCREASE_CHANGE:
             self.log.warning(f"变更行数{str(change_len)}行，超过规定{str(CONFIG.MAX_INCREASE_CHANGE)},退化为全量同步")
             return self.trans_sync()
         else:
@@ -432,8 +449,16 @@ class sync_increase(task):
         self.log.info(f"任务{self.data.name}初始化完成")
 
     def trans_sync(self) -> None:
-        df = pd.read_sql(self.data.source_sync_sql, self.source)
-        index = df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
+        first_label = True
+        index = 0
+        df = pd.read_sql(self.data.source_sync_sql, self.source, chunksize=CONFIG.MAX_SYNC_BATCHSIZE)
+        for ch_df in df:
+            if first_label:
+                temp_index = ch_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
+                first_label = False
+            else:
+                temp_index = ch_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
+            index += temp_index if temp_index is not None else 0
         self.log.debug(f"全量抽取已完成,抽取了{str(index)}行")
         meta_data = get_database_metadata(self.target, CONFIG.CONNECT[self.data.target].dbtype, self.data.target_db, self.data.target_table)
         self.local.execute(f"CREATE OR REPLACE TABLE meta.{self.data.target_db}_{self.data.target_table} AS SELECT * FROM meta_data")

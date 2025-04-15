@@ -34,5 +34,5 @@ def init(connect_data: connect_data) -> list[task]:
                 target_increase_sql=read_sql(os.path.join("error", "alignment_error_initiate", "increase", "alignment_error_initiate_target.sql")),
             )
         ),
-        alignment_error_process(connect_data)
+        # alignment_error_process(connect_data)
     ]
