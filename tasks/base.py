@@ -11,8 +11,10 @@ from utils.config import CONFIG
 from utils.connect import connect_data
 from utils.logger import make_logger
 
+
 class task(ABC):
     '''所有任务的抽象'''
+
     def __init__(self, _duckdb: duckdb.DuckDBPyConnection, name: str, logger_name: str) -> None:
         self.name = name
         self.start_run = False
@@ -130,33 +132,70 @@ class sync(task):
         self.target.close()
 
 
-def get_diff(source_increase_df: pd.DataFrame, target_increase_df: pd.DataFrame) -> tuple[list, list, list]:
+def get_diff(cursor: duckdb.DuckDBPyConnection, source_increase_df: pd.DataFrame, target_increase_df: pd.DataFrame) -> tuple[list, list, list]:
     '''获取两个dataframe的不同'''
     if source_increase_df.columns.to_list() != target_increase_df.columns.to_list():
         raise ValueError("增量检查的数据列名不同")
-    
-    new_diff = source_increase_df[~source_increase_df['id'].isin(target_increase_df['id'])]['id'].tolist()
-    del_diff = target_increase_df[~target_increase_df['id'].isin(source_increase_df['id'])]['id'].tolist()
-    # 获取共同ID的记录
-    common_ids = pd.merge(source_increase_df, target_increase_df, on='id', how='inner', suffixes=('_a', '_b'))
-    # 正确处理NaN值比较
-    def compare_with_nan(row, col):
-        a_val, b_val = row[f'{col}_a'], row[f'{col}_b']
-        if pd.isna(a_val) and pd.isna(b_val):
-            return False  # 两个NaN值视为相等
-        elif pd.isna(a_val) or pd.isna(b_val):
-            return True   # 一个NaN一个非NaN视为不等
-        else:
-            return a_val != b_val
-    # 修复：只比较非id列，避免尝试访问不存在的'id_a'和'id_b'
+
+    new_diff = cursor.sql(
+        f"""
+        SELECT "id" FROM source_increase_df
+        EXCEPT
+        SELECT "id" FROM target_increase_df
+        """
+    ).fetchall()
+    new_diff = [item[0] for item in new_diff]
+    del_diff = cursor.sql(
+        f"""
+        SELECT "id" FROM target_increase_df
+        EXCEPT
+        SELECT "id" FROM source_increase_df
+        """
+    ).fetchall()
+    del_diff = [item[0] for item in del_diff]
+
+    # 比较共同 ID 的记录是否有差异
     columns_to_check = [col for col in source_increase_df.columns if col != 'id']
-    common_ids['is_diff'] = common_ids.apply(
-        lambda row: any(compare_with_nan(row, col) for col in columns_to_check), 
-        axis=1
-    )
-    change_diff = common_ids[common_ids['is_diff']]
-    if len(change_diff):
-        change_diff = common_ids[common_ids['is_diff']]['id'].tolist()
+    if len(columns_to_check) != 0:
+        diff_columns = ', '.join(
+            [
+                f"""
+                    CASE 
+                        WHEN s.{col} IS NULL AND t.{col} IS NULL THEN false
+                        WHEN s.{col} IS NULL OR t.{col} IS NULL THEN true
+                        WHEN s.{col} != t.{col} THEN true
+                        ELSE false
+                    END AS {col}_diff
+                """
+                for col in columns_to_check
+            ]
+        )
+        diff_columns_name = ', '.join([f"{col}_diff" for col in columns_to_check])
+        change_diff = cursor.sql(
+            f'''
+                WITH 
+                    diff_data AS (
+                        SELECT 
+                            s.id, 
+                            {diff_columns}
+                        FROM source_increase_df s
+                        INNER JOIN target_increase_df t ON s.id = t.id
+                    ),
+                    diff_flags AS (
+                        SELECT 
+                            id,
+                            CASE 
+                                WHEN COALESCE({diff_columns_name}) THEN 1
+                                ELSE 0
+                            END AS is_diff
+                        FROM diff_data
+                    )
+                SELECT id
+                FROM diff_flags
+                WHERE is_diff = 1
+            '''
+        ).fetchall()
+        change_diff = [item[0] for item in change_diff]
     else:
         change_diff = []
     return new_diff, del_diff, change_diff
@@ -269,7 +308,7 @@ class load_increase(task):
             return self.trans_sync()
         target_increase_df = pd.read_sql(self.data.target_increase_sql, self.target)
         source_increase_df: pd.DataFrame = self.source.sql(self.data.source_increase_sql).fetchdf()
-        new_diff, del_diff, change_diff = get_diff(source_increase_df, target_increase_df)
+        new_diff, del_diff, change_diff = get_diff(self.source, source_increase_df, target_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
@@ -334,7 +373,7 @@ class extract_increase(task):
             return self.trans_sync()
         taget_increase_df: pd.DataFrame = self.target.sql(self.data.target_increase_sql).fetchdf()
         source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
+        new_diff, del_diff, change_diff = get_diff(self.target, source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
@@ -412,7 +451,7 @@ class sync_increase(task):
             return self.trans_sync()
         taget_increase_df = pd.read_sql(self.data.target_increase_sql, self.target)
         source_increase_df = pd.read_sql(self.data.source_increase_sql, self.source)
-        new_diff, del_diff, change_diff = get_diff(source_increase_df, taget_increase_df)
+        new_diff, del_diff, change_diff = get_diff(self.local, source_increase_df, taget_increase_df)
         # 如果超过要求大小，退化为全量同步
         change_len = len(new_diff) + len(change_diff)
         if change_len > CONFIG.MAX_INCREASE_CHANGE:
@@ -434,7 +473,7 @@ class sync_increase(task):
             if len(change_diff) > 0:
                 delete_statement = text(f"DELETE FROM {self.data.target_db}.{self.data.target_table} WHERE id IN ({','.join([f"\'{ch}\'" for ch in change_diff])})")
                 self.target.execute(delete_statement)
-                self.target.commit() 
+                self.target.commit()
         # 查询需要新增和需要变更的数据写入目标表
         if len(new_diff) + len(change_diff) > 0:
             ids_to_select = new_diff + change_diff
