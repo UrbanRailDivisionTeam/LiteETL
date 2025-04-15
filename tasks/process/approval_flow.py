@@ -12,11 +12,23 @@ class entity_design_process(process):
         entity_df: pd.DataFrame = self.connect.sql('SELECT * FROM ods.af_entity_design').fetchdf()
 
         def temp_apply(row: pd.Series) -> pd.Series:
-            temp_row = pd.Series(index=['id', '单据名称', '单据数据库表名'])
-            temp_row["id"] = row["id"]
-            temp_row["单据名称"] = row["单据名称"]
-            temp_row["单据数据库表名"] = ET.fromstring(row["单据xml数据"]).findall("EntityMetadata")[0].findall("Items")[0].findall("TableName")[0]
-            return temp_row
+            temp_row = {
+                'id': str(row["id"]), 
+                '单据名称':  str(row["单据名称"]), 
+                '单据数据库表名': ""
+            }
+            root = ET.fromstring(row["单据xml数据"])
+            Items = root[0].findall("Items")
+            if len(Items) == 0:
+                return pd.Series(temp_row)
+            BillEntity = Items[0].findall("BillEntity")
+            if len(BillEntity) == 0:
+                return pd.Series(temp_row)
+            TableName = BillEntity[0].findall("TableName")
+            if len(TableName) == 0:
+                return pd.Series(temp_row)
+            temp_row["单据数据库表名"] = str(TableName[0].text)
+            return pd.Series(temp_row)
         new_df = entity_df.apply(temp_apply, axis=1)
         self.connect.sql(
             f'''

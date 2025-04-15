@@ -1,8 +1,9 @@
 import os
+import gc
 import time
 import duckdb
 from concurrent.futures import ThreadPoolExecutor
-from tasks.base import task, extract_increase, extract
+from tasks.base import task
 from utils.logger import make_logger
 
 
@@ -47,8 +48,16 @@ class executer:
                     self.tpool.submit(_task.run)
             if self.can_stop():
                 break
-            # 一般抽取任务最少也要0.1秒完成，0.5秒检查一次
-            time.sleep(0.1)
+            # 适当延时以防止频繁回收和检查
+            time.sleep(0.5)
+            '''
+            每次主线程循环检查时就执行一次垃圾回收，
+            因为服务对于延迟不敏感，却有大数据集需要频繁加载到内存
+            所以对于整体内存使用效率敏感，
+            并且程序设计时考虑到python的性能问题，基本将所有的计算负载全部写成sql放到了duckdb中执行
+            因此应当尽可能执行垃圾回收，将剩余的内存交给duckdb来使用
+            '''
+            gc.collect()
         self.log.info("调度器已执行完成")
 
     @staticmethod

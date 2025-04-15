@@ -1,5 +1,5 @@
 SELECT
-    CONCAT (EmployeeID, TypeID) AS "id",
+    CONCAT(EmployeeID, TypeID, FORMAT(StatisticsDate, 'yyyyMMdd')) AS "id",
     EmployeeID AS "员工考勤系统id",
     StatisticsDate AS "调整时间",
     TypeID AS "考勤类型id",
@@ -9,4 +9,4 @@ SELECT
 FROM
     YQ_KQ_AS_MonthTotalDay
 WHERE
-    StatisticsDate >= DATEADD (year, -1, GETDATE ())
+    StatisticsDate >= DATEADD(DAY, -30, GETDATE())
