@@ -25,12 +25,10 @@ class config:
     # 同步配置的间隔时长
     INTERVAL_DURATION: float = 5 * 60
     # 增量同步变更量最大值，新增的行数和修改的行数之和超过这个数，增量同步就退化为全量同步
-    MAX_INCREASE_CHANGE: int = 5000
+    MAX_INCREASE_CHANGE: int = 2000
     # 因为oracle数据库的ora 01975 maxium number of expression in a list is 1000
     # 所以这里需要存储对应的where列表最大大小，超过则需要切分
     MAX_WHERE_LIST: int = 1000
-    # 默认的批量大小
-    DEFAULT_BATCH_SIZE = 100000
 
 
 DEBUG = False
