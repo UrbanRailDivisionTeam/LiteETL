@@ -114,7 +114,8 @@ class alignment_error_process(process):
                 COUNT(bill."id")
             FROM ods.alignment_error_handle bill
             WHERE 
-                bill."提报时间" >= CURRENT_DATE
+                
+                AND bill."提报时间" >= CURRENT_DATE
                 AND bill."提报时间"  < CURRENT_DATE + INTERVAL '1' DAY
             '''
         ).fetchall()

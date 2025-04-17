@@ -57,6 +57,5 @@ def task_init(connect_data: connect_data) -> list[task]:
     # 用于任务类相关关系定义
     gp["全员型改善数据分析"].dp(gp["改善数据抽取"]).dp(gp["人员基础数据抽取"])
     gp["线号标签申请数据处理"].dp(gp["线号标签申请上下标数据抽取"]).dp(gp["线号标签申请位置号数据抽取"])
-    gp["苍穹数据模型处理"].dp(gp["单据数据模型抽取"])
     return list(gp.values())
         

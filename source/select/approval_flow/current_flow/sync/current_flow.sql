@@ -1,9 +1,9 @@
 SELECT
     bill.fid as "id",
+    bill.FPROCDEFID as "流程定义ID",
     bill.FPROCINSTID as "流程实例ID",
     bill.FBUSINESSKEY as "业务主键",
     bill.FPARENTID as "父流程实例ID",
-    bill.FPROCDEFID as "流程定义ID",
     bill.FSUPEREXEC as "主流程实例ID",
     bill.fbusinessid as "流程标识",
     bill.FROOTPROCINSTID as "根流程实例ID",
