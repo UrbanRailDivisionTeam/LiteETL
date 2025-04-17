@@ -20,7 +20,13 @@ def judge_day(input_time: datetime.datetime, cursor: duckdb.DuckDBPyConnection, 
     # 如果没有额外的节假日，就按照周一到周五上班返回
     return input_time.weekday() < 5
 
-
+def judge_on_time(expect_time: datetime.datetime, real_time: datetime.datetime) -> bool:
+    '''判断时间是否及时'''
+    if not real_time is pd.NaT:
+        return real_time <= expect_time
+    else:
+        return datetime.datetime.now() <= expect_time
+    
 def judje_time(
     input_time: datetime.datetime,
     cursor: duckdb.DuckDBPyConnection,
@@ -91,6 +97,10 @@ def judje_time(
 class alignment_error_process(process):
     def __init__(self, connect: connect_data) -> None:
         super().__init__(connect.duckdb, connect.mongo, "校线异常数据处理", "error_process")
+        self.request_form_name = "crrc_unqualify"
+        self.request_flow_name = "Proc_crrc_unqualify_audit_7"
+        self.deal_form_name = "crrc_unqualifydeal"
+        self.deal_flow_name = "Proc_crrc_unqualifydeal_audit_7"
 
     def task_main(self) -> None:
         def process(input_time: datetime.datetime) -> datetime.datetime:
@@ -108,18 +118,19 @@ class alignment_error_process(process):
                 ]
             )
             return real_time
-        temp0 = self.connect.sql(
+        # 当天异常总数
+        today_error = self.connect.sql(
             f'''
             SELECT
                 COUNT(bill."id")
             FROM ods.alignment_error_handle bill
             WHERE 
-                
-                AND bill."提报时间" >= CURRENT_DATE
+                bill."提报时间" >= CURRENT_DATE
                 AND bill."提报时间"  < CURRENT_DATE + INTERVAL '1' DAY
             '''
-        ).fetchall()
-        temp1 = self.connect.sql(
+        ).fetchall()[0][0]
+        # 当月异常总数
+        month_error = self.connect.sql(
             f'''
             SELECT
                 COUNT(bill."id")
@@ -128,45 +139,9 @@ class alignment_error_process(process):
                 bill."提报时间" >= DATE_TRUNC('month', CURRENT_DATE)
                 AND bill."提报时间" < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1' MONTH
             '''
-        ).fetchall()
-        temp2 = self.connect.sql(
-            f'''
-            SELECT
-                COUNT(bill."id")
-            FROM ods.alignment_error_handle bill
-            WHERE bill."单据状态" = '待响应' OR bill."单据状态" = '转交中'
-            '''
-        ).fetchall()
-        temp3 = self.connect.sql(
-            f'''
-            SELECT
-                COUNT(bill."id")
-            FROM ods.alignment_error_handle bill
-            WHERE bill."单据状态" = '已响应'
-            '''
-        ).fetchall()
-        total_process_handle: pd.DataFrame = self.connect.sql(f'''SELECT * FROM ods.alignment_error_handle''').fetchdf()
-        total_process_initiate: pd.DataFrame = self.connect.sql(f'''SELECT * FROM ods.alignment_error_initiate''').fetchdf()
-        total_process_handle["预计响应时间"] = total_process_handle.apply(lambda row: process(row["提报时间"]), axis=1)
-        total_process_handle["是否及时响应"] = total_process_handle.apply(lambda row: row["响应时间"] >= row["预计响应时间"], axis=1)
-        ...
-
-        total_process_handle_res = total_process_handle[["项目名称",  "列车号", "校线节车号", "构型项名称", "现象分类", "现象描述", "响应人姓名"]]
-        
-        temp4 = self.connect.sql(
-            f'''
-            SELECT
-                bill."所属班组",
-                CAES 
-                    WHEN COUNT(bill."id") = 0 
-                    THEN 0
-                    ELSE SUM(bill."是否及时响应") / COUNT(bill."id") 
-                END AS "及时响应率"
-            FROM total_process_handle_res bill
-            GROUP BY bill."所属班组"
-            '''
-        ).fetchdf()
-        temp5 = self.connect.sql(
+        ).fetchall()[0][0]
+        # 项目的节车异常平均统计
+        project_average_error = self.connect.sql(
             f'''
             SELECT
                 bill."项目号",
@@ -175,15 +150,231 @@ class alignment_error_process(process):
                     THEN 0
                     ELSE COUNT(bill."id")  / COUNT(bill2."校线节车号")
                 END AS "异常平均数统计"
-            FROM total_process_handle_res bill
+            FROM ods.alignment_error_handle bill
             LEFT JOIN (
                 SELECT 
                     DISTINCT
                     bill."项目号",
                     bill."列车号",
                     bill."校线节车号"
-                FROM total_process_handle_res bill
+                FROM ods.alignment_error_handle bill
             ) bill2 on bill2."项目号" = bill."项目号"
             GROUP BY bill."项目号"
             '''
         ).fetchdf()
+        # 申请单及时相关计算
+        flow_operation_0: pd.DataFrame = self.connect.sql(
+                f'''
+                WITH flow_object AS (
+                        SELECT 
+                            bill."id",
+                            bill."单据编码",
+                            bill."流程实例ID",
+                            bill."流程标识",
+                        FROM ods.af_historical_flow bill
+                        LEFT JOIN ods.alignment_error_handle aleh ON aleh."单据编号" = bill."单据编码"
+                        WHERE 
+                            bill."实体编码" = '{self.request_form_name}' 
+                            AND bill."流程标识" = '{self.request_flow_name}'
+                            AND aleh."单据状态" <> '暂存'
+                        UNION
+                        SELECT 
+                            bill."id",
+                            bill."单据编码",
+                            bill."流程实例ID",
+                            t_bill."流程标识"
+                        FROM ods.af_current_flow bill
+                        LEFT JOIN ods.alignment_error_handle aleh ON aleh."单据编号" = bill."单据编码"
+                        LEFT JOIN (
+                            SELECT
+                                bill."id",
+                                bill."流程标识",
+                            FROM ods.af_current_flow bill
+                            WHERE 
+                                bill."流程标识" IS NOT NULL 
+                                AND bill."流程标识" <> '' 
+                                AND bill."流程标识" <> ' '
+                        )  t_bill ON t_bill."id" = bill."根流程实例ID"
+                        WHERE 
+                            bill."单据类型" = '{self.request_form_name}' 
+                            AND t_bill."流程标识" = '{self.request_flow_name}'
+                            AND aleh."单据状态" <> '暂存'
+                    ),
+                    flow_operation AS (
+                        SELECT 
+                            bill."单据编码",
+                            GREATEST(MAX(op_0."修改日期"), MAX(op_1."修改日期"), MAX(op_2."修改日期"), MAX(op_3."修改日期")) AS "响应计算起始时间"
+                        FROM flow_object bill
+                        LEFT JOIN ods.af_operation_log op_0 ON 
+                            bill."流程实例ID" = op_0."流程实例ID" 
+                            AND op_0."活动实例名称" = '校线异常发起单提交'
+                            AND op_0."结果编码" = 'submit'
+                        LEFT JOIN ods.af_operation_log op_1 ON 
+                            bill."流程实例ID" = op_0."流程实例ID" 
+                            AND op_0."活动实例名称" = '整改人'
+                            AND op_0."结果编码" = 'RejectToEdit'
+                        LEFT JOIN ods.af_operation_log op_2 ON 
+                            bill."流程实例ID" = op_0."流程实例ID" 
+                            AND op_0."活动实例名称" = '质量专员'
+                            AND op_0."结果编码" = 'RejectToEdit'
+                        LEFT JOIN ods.af_operation_log op_3 ON 
+                            bill."流程实例ID" = op_0."流程实例ID" 
+                            AND op_0."活动实例名称" = '转交处理人'
+                            AND op_0."结果编码" = 'RejectToEdit'
+                        GROUP BY bill."单据编码"
+                        ORDER BY bill."单据编码"
+                    )
+                SELECT 
+                    bill."单据编码",
+                    bill."响应计算起始时间",
+                    afhf."响应时间" AS "实际响应时间"
+                FROM flow_operation bill
+                LEFT JOIN ods.alignment_error_handle afhf ON afhf."单据编号" = bill."单据编码"
+                '''
+            ).fetchdf()
+        def temp_apply_0(row: pd.Series) -> pd.Series:
+            row["预计及时响应时间"] = process(row["响应计算起始时间"])
+            row["是否及时响应"] = judge_on_time(row["预计及时响应时间"], row["实际响应时间"])
+            return row
+        flow_operation_0 = flow_operation_0.apply(temp_apply_0, axis=1)
+        # 处理单及时相关计算
+        flow_operation_1: pd.DataFrame = self.connect.sql(
+            f"""
+                WITH flow_object AS (
+                        SELECT 
+                            bill."id",
+                            bill."单据编码",
+                            bill."流程实例ID",
+                            bill."流程标识",
+                        FROM ods.af_historical_flow bill
+                        LEFT JOIN ods.alignment_error_handle aleh ON aleh."单据编号" = bill."单据编码"
+                        WHERE 
+                            bill."实体编码" = '{self.deal_form_name}' 
+                            AND bill."流程标识" = '{self.deal_flow_name}'
+                        UNION
+                        SELECT 
+                            bill."id",
+                            bill."单据编码",
+                            bill."流程实例ID",
+                            t_bill."流程标识"
+                        FROM ods.af_current_flow bill
+                        LEFT JOIN ods.alignment_error_handle aleh ON aleh."单据编号" = bill."单据编码"
+                        LEFT JOIN (
+                            SELECT
+                                bill."id",
+                                bill."流程标识",
+                            FROM ods.af_current_flow bill
+                            WHERE 
+                                bill."流程标识" IS NOT NULL 
+                                AND bill."流程标识" <> '' 
+                                AND bill."流程标识" <> ' '
+                        )  t_bill ON t_bill."id" = bill."根流程实例ID"
+                        WHERE 
+                            bill."单据类型" = '{self.deal_form_name}' 
+                            AND t_bill."流程标识" = '{self.deal_flow_name}'
+                    ),
+                flow_operation AS (
+                    SELECT 
+                        bill."单据编码",
+                        MAX(op_0."修改日期") AS "实际发起诊断时间",
+                        MAX(op_1."修改日期") AS "实际诊断时间",
+                        MAX(op_1."修改日期") AS "实际返工时间",
+                        MAX(op_1."修改日期") AS "实际验收时间",
+                    FROM flow_object bill
+                LEFT JOIN ods.af_operation_log op_0 ON 
+                    bill."流程实例ID" = op_0."流程实例ID" 
+                    AND op_0."活动实例名称" = '校线异常处理提交'
+                    AND op_0."结果编码" = 'submit'
+                LEFT JOIN ods.af_operation_log op_1 ON 
+                    bill."流程实例ID" = op_1."流程实例ID" 
+                    AND op_1."活动实例名称" = '指定诊断人'
+                    AND op_1."结果编码" = 'Consent'
+                LEFT JOIN ods.af_operation_log op_2 ON 
+                    bill."流程实例ID" = op_2."流程实例ID" 
+                    AND op_2."活动实例名称" = '返工执行人'
+                    AND op_2."结果编码" = 'Consent'
+                LEFT JOIN ods.af_operation_log op_3 ON 
+                    bill."流程实例ID" = op_3."流程实例ID" 
+                    AND op_3."活动实例名称" = '提报人'
+                    AND op_3."结果编码" = 'Consent'
+                    GROUP BY bill."单据编码"
+                    ORDER BY bill."单据编码"
+                )
+                SELECT
+                    alei."单据编号" AS "单据编码",
+                    alei."响应时间" AS "发起诊断计算起始时间",
+                    bill."实际发起诊断时间",
+                    bill."实际诊断时间",
+                    bill."实际返工时间",
+                    bill."实际验收时间",
+                FROM ods.alignment_error_initiate alei 
+                LEFT JOIN flow_operation bill ON alei."单据编号" = bill."单据编码"
+                WHERE NOT bill."单据编码" IS NULL
+            """
+        ).fetchdf()
+        def temp_apply_1(row: pd.Series) -> pd.Series:
+            if not row["发起诊断计算起始时间"] is pd.NaT:
+                row["预计及时发起诊断时间"] = process(row["发起诊断计算起始时间"])
+                row["是否及时发起诊断"] = judge_on_time(row["预计及时发起诊断时间"], row["实际发起诊断时间"])
+            else:
+                row["预计及时发起诊断时间"] = pd.NaT
+                row["是否及时发起诊断"] = pd.NaT
+            if not row["实际发起诊断时间"] is pd.NaT:
+                row["预计及时诊断时间"] = process(row["实际发起诊断时间"])
+                row["是否及时诊断"] = judge_on_time(row["预计及时诊断时间"], row["实际诊断时间"])
+            else:
+                row["预计及时诊断时间"] = pd.NaT
+                row["是否及时诊断"] = pd.NaT
+            if not row["实际诊断时间"] is pd.NaT:
+                row["预计及时返工时间"] = process(row["实际诊断时间"])
+                row["是否及时返工"] = judge_on_time(row["预计及时返工时间"], row["实际返工时间"])
+            else:
+                row["预计及时返工时间"] = pd.NaT
+                row["是否及时返工"] = pd.NaT
+            if not row["实际返工时间"] is pd.NaT:
+                row["预计及时验收时间"] = process(row["实际返工时间"])
+                row["是否及时验收"] = judge_on_time(row["预计及时验收时间"], row["实际返工时间"])
+            else:
+                row["预计及时验收时间"] = pd.NaT
+                row["是否及时验收"] = pd.NaT
+            return row
+        flow_operation_1 = flow_operation_1.apply(temp_apply_1, axis=1)
+        # 及时率相关明细
+        ontime_final_result = self.connect.sql(
+            f"""
+                SELECT 
+                    f0."单据编码" AS "单据编码",
+                    f0."响应计算起始时间",
+                    f0."预计及时响应时间",
+                    f0."实际响应时间",
+                    f0."是否及时响应",
+
+                    f1."发起诊断计算起始时间",
+                    f1."预计及时发起诊断时间",
+                    f1."实际发起诊断时间",
+                    f1."是否及时发起诊断",
+
+                    f1."实际发起诊断时间" AS "诊断计算起始时间",
+                    f1."预计及时诊断时间",
+                    f1."实际诊断时间",
+                    f1."是否及时诊断",
+
+                    f1."实际诊断时间" AS "返工计算起始时间",
+                    f1."预计及时返工时间",
+                    f1."实际返工时间",
+                    f1."是否及时返工",
+
+                    f1."实际返工时间" AS "验收计算起始时间",
+                    f1."预计及时验收时间",
+                    f1."实际验收时间",
+                    f1."是否及时验收"
+                FROM flow_operation_0 f0 
+                FULL JOIN flow_operation_1 f1 ON f0."单据编码" = f1."单据编码"
+            """
+        ).fetchdf()
+
+
+
+
+        
+
