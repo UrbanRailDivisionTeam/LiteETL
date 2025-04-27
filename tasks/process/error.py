@@ -276,8 +276,8 @@ class alignment_error_process(process):
                 flow_operation AS (
                     SELECT 
                         bill."单据编码",
-                        MAX(op_0."修改日期") AS "实际发起诊断时间",
-                        MAX(op_1."修改日期") AS "实际诊断时间",
+                        MAX(op_0."修改日期") AS "实际一次诊断时间",
+                        MAX(op_1."修改日期") AS "实际二次诊断时间",
                         MAX(op_1."修改日期") AS "实际返工时间",
                         MAX(op_1."修改日期") AS "实际验收时间",
                     FROM flow_object bill
@@ -302,9 +302,9 @@ class alignment_error_process(process):
                 )
                 SELECT
                     alei."单据编号" AS "单据编码",
-                    alei."响应时间" AS "发起诊断计算起始时间",
-                    bill."实际发起诊断时间",
-                    bill."实际诊断时间",
+                    alei."响应时间" AS "一次诊断计算起始时间",
+                    bill."实际一次诊断时间",
+                    bill."实际二次诊断时间",
                     bill."实际返工时间",
                     bill."实际验收时间",
                 FROM ods.alignment_error_initiate alei 
@@ -313,20 +313,22 @@ class alignment_error_process(process):
             """
         ).fetchdf()
         def temp_apply_1(row: pd.Series) -> pd.Series:
-            if not row["发起诊断计算起始时间"] is pd.NaT:
-                row["预计及时发起诊断时间"] = process(row["发起诊断计算起始时间"])
-                row["是否及时发起诊断"] = judge_on_time(row["预计及时发起诊断时间"], row["实际发起诊断时间"])
+            if not row["一次诊断计算起始时间"] is pd.NaT:
+                row["预计及时一次诊断时间"] = process(row["一次诊断计算起始时间"])
+                row["是否及时一次诊断"] = judge_on_time(row["预计及时一次诊断时间"], row["实际一次诊断时间"])
             else:
-                row["预计及时发起诊断时间"] = pd.NaT
-                row["是否及时发起诊断"] = pd.NaT
-            if not row["实际发起诊断时间"] is pd.NaT:
-                row["预计及时诊断时间"] = process(row["实际发起诊断时间"])
-                row["是否及时诊断"] = judge_on_time(row["预计及时诊断时间"], row["实际诊断时间"])
+                row["预计及时一次诊断时间"] = pd.NaT
+                row["是否及时一次诊断"] = pd.NaT
+            if not row["实际一次诊断时间"] is pd.NaT:
+
+
+                row["预计及时二次诊断时间"] = process(row["实际一次诊断时间"])
+                row["是否及时二次诊断"] = judge_on_time(row["预计及时二次诊断时间"], row["实际二次诊断时间"])
             else:
-                row["预计及时诊断时间"] = pd.NaT
-                row["是否及时诊断"] = pd.NaT
-            if not row["实际诊断时间"] is pd.NaT:
-                row["预计及时返工时间"] = process(row["实际诊断时间"])
+                row["预计及时二次诊断时间"] = pd.NaT
+                row["是否及时二次诊断"] = pd.NaT
+            if not row["实际二次诊断时间"] is pd.NaT:
+                row["预计及时返工时间"] = process(row["实际二次诊断时间"])
                 row["是否及时返工"] = judge_on_time(row["预计及时返工时间"], row["实际返工时间"])
             else:
                 row["预计及时返工时间"] = pd.NaT
@@ -343,7 +345,7 @@ class alignment_error_process(process):
         ontime_final_result = self.connect.sql(
             f"""
                 SELECT 
-                    f0."单据编码" AS "单据编码",
+                    f0."单据编码",
                     f0."响应计算起始时间",
                     f0."预计及时响应时间",
                     f0."实际响应时间",
@@ -370,6 +372,7 @@ class alignment_error_process(process):
                     f1."是否及时验收"
                 FROM flow_operation_0 f0 
                 FULL JOIN flow_operation_1 f1 ON f0."单据编码" = f1."单据编码"
+                
             """
         ).fetchdf()
 
