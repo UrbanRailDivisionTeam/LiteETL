@@ -1,6 +1,7 @@
 import datetime
 import duckdb
 import pandas as pd
+from typing import Any
 from tasks.process import process
 from utils.connect import connect_data
 
@@ -240,7 +241,7 @@ class alignment_error_process(process):
         # 各个关键环节的要求响应时长与流程总时长
         self.request_time = {
             "响应": datetime.timedelta(hours=2),
-            "初步诊断": datetime.timedelta(hours=2),
+            "一次诊断": datetime.timedelta(hours=2),
             "二次诊断": datetime.timedelta(hours=2),
             "返工": datetime.timedelta(hours=2),
             "验收": datetime.timedelta(hours=2),
@@ -435,7 +436,7 @@ class alignment_error_process(process):
         ).fetchdf()
 
         def temp_apply_initiate(row: pd.Series) -> pd.Series:
-            row["预计及时一次诊断时间"] = self.judje_time_func(row["一次诊断计算起始时间"], self.request_time["初步诊断"])
+            row["预计及时一次诊断时间"] = self.judje_time_func(row["一次诊断计算起始时间"], self.request_time["一次诊断"])
             row["一次诊断用时"] = self.judje_time_inverse_func(row["一次诊断计算起始时间"], row["实际一次诊断时间"])
             row["是否及时一次诊断"] = judge_on_time(row["预计及时一次诊断时间"], row["实际一次诊断时间"])
 
@@ -452,41 +453,84 @@ class alignment_error_process(process):
             row["是否及时验收"] = judge_on_time(row["预计及时验收时间"], row["实际验收时间"])
             return row
         flow_operation_initiate = flow_operation_initiate.apply(temp_apply_initiate, axis=1)
-        # 及时率相关明细
-        ontime_final_result = self.connect.sql(
+        # 校线异常相关明细
+        self.connect.sql(
             f"""
-                SELECT 
-                    f0."单据编码",
-                    f0."响应计算起始时间",
-                    f0."预计及时响应时间",
-                    f0."实际响应时间",
-                    f0."响应用时",
-                    f0."是否及时响应",
+                CREATE OR REPLACE TABLE dwd.ontime_final_result AS 
+                    SELECT 
+                        f0."单据编码",
+                        f0."响应计算起始时间",
+                        f0."预计及时响应时间",
+                        f0."实际响应时间",
+                        f0."响应用时",
+                        f0."是否及时响应",
 
-                    f1."一次诊断计算起始时间",
-                    f1."预计及时一次诊断时间",
-                    f1."实际一次诊断时间",
-                    f1."一次诊断用时",
-                    f1."是否及时一次诊断",
+                        f1."一次诊断计算起始时间",
+                        f1."预计及时一次诊断时间",
+                        f1."实际一次诊断时间",
+                        f1."一次诊断用时",
+                        f1."是否及时一次诊断",
 
-                    f1."实际一次诊断时间" AS "诊断计算起始时间",
-                    f1."预计及时二次诊断时间",
-                    f1."实际二次诊断时间",
-                    f1."二次诊断用时",
-                    f1."是否及时二次诊断",
+                        f1."实际一次诊断时间" AS "二次诊断计算起始时间",
+                        f1."预计及时二次诊断时间",
+                        f1."实际二次诊断时间",
+                        f1."二次诊断用时",
+                        f1."是否及时二次诊断",
 
-                    f1."实际二次诊断时间" AS "返工计算起始时间",
-                    f1."预计及时返工时间",
-                    f1."实际返工时间",
-                    f1."返工用时",
-                    f1."是否及时返工",
+                        f1."实际二次诊断时间" AS "返工计算起始时间",
+                        f1."预计及时返工时间",
+                        f1."实际返工时间",
+                        f1."返工用时",
+                        f1."是否及时返工",
 
-                    f1."实际返工时间" AS "验收计算起始时间",
-                    f1."预计及时验收时间",
-                    f1."实际验收时间",
-                    f1."验收用时",
-                    f1."是否及时验收"
-                FROM flow_operation_handle f0 
-                FULL JOIN flow_operation_initiate f1 ON f0."单据编码" = f1."单据编码"
+                        f1."实际返工时间" AS "验收计算起始时间",
+                        f1."预计及时验收时间",
+                        f1."实际验收时间",
+                        f1."验收用时",
+                        f1."是否及时验收"
+                    FROM flow_operation_handle f0 
+                    FULL JOIN flow_operation_initiate f1 ON f0."单据编码" = f1."单据编码"
             """
-        ).fetchdf()
+        )
+        # 前端上最上面那一排指标卡片的数据
+        temp_map = {
+            "未响应异常数": 0,
+            "一次诊断进行中流程数": 1,
+            "二次诊断进行中流程数": 2,
+            "返工进行中流程数": 3,
+            "验收进行中流程数": 4,
+        }
+        def temp_make_json(title_name: str, real_time_name: str, start_time_name: str, use_time_name: str, request_time_name: str) -> dict[str, Any]:
+            in_process = self.connect.sql(
+                f"""
+                    SELECT 
+                        COUNT(bill."单据编码")
+                    FROM dwd.ontime_final_result bill
+                    WHERE bill."{real_time_name}" IS NULL AND NOT bill."{start_time_name}" IS NULL
+                """
+            ).fetchall()[0][0]
+            average_value = self.connect.sql(
+                f"""
+                    SELECT 
+                        SUM(epoch(bill."{use_time_name}") / 60) / COUNT(bill."单据编码")
+                    FROM dwd.ontime_final_result bill
+                    WHERE NOT bill."{use_time_name}" IS NULL
+                """
+            ).fetchall()[0][0]
+            request_value = int(self.request_time[request_time_name].total_seconds() / 60)
+            trend = 'ontime' if request_value > average_value else 'overtime'
+            return {
+                "index": temp_map[title_name],
+                "title_name" : title_name,
+                "trend": trend,
+                "request_value": in_process,
+                "request_time": request_value,
+                "average_time": average_value,
+            }
+        calibration_line_total_data = [
+            temp_make_json("未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
+            temp_make_json("一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
+            temp_make_json("二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
+            temp_make_json("返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
+            temp_make_json("验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
+        ]
