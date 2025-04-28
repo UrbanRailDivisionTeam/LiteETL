@@ -10,3 +10,4 @@ source/*.db
 source/*.wal
 
 *.zip
+.VSCodeCounter
