@@ -232,6 +232,8 @@ def judje_time_inverse(
 class alignment_error_process(process):
     def __init__(self, connect: connect_data) -> None:
         super().__init__(connect.duckdb, connect.mongo, "校线异常数据处理", "error_process")
+        # 流程及格标准
+        self.on_time_norms = 0.8
         # 校线异常发起单
         self.request_form_name = "crrc_unqualify"
         self.request_flow_name = "Proc_crrc_unqualify_audit_7"
@@ -453,43 +455,127 @@ class alignment_error_process(process):
             row["是否及时验收"] = judge_on_time(row["预计及时验收时间"], row["实际验收时间"])
             return row
         flow_operation_initiate = flow_operation_initiate.apply(temp_apply_initiate, axis=1)
+        # 单据在不同流程中所属的部门
+        flow_operation_department: pd.DataFrame = self.connect.sql(
+            f"""
+                WITH flow_person AS (
+                        SELECT  
+                            aleh."单据编号",
+                            COALESCE(aleh."响应人工号", aleh."转交人工号", aleh."整改人工号") AS "响应所属人工号",
+                            alei."提报人工号" AS "一次诊断所属人工号",
+                            alei."指定诊断人工号" AS "二次诊断所属人工号",
+                            alei."提报人工号" AS "返工所属人工号",
+                            aleh."提报人工号" AS "验收所属人工号"
+                        FROM ods.alignment_error_handle aleh
+                        FULL JOIN ods.alignment_error_initiate alei ON aleh."单据编号" = alei."单据编号"
+                    )
+                    SELECT
+                        f."单据编号",
+                        p0."末级组织名称" AS "响应所属组室",
+                        p1."末级组织名称" AS "一次诊断所属组室",
+                        p2."末级组织名称" AS "二次诊断所属组室",
+                        p3."末级组织名称" AS "返工所属组室",
+                        p4."末级组织名称" AS "验收所属组室"
+                    FROM flow_person f
+                    LEFT JOIN ods.person p0 ON p0."员工编码" = f."响应所属人工号"
+                    LEFT JOIN ods.person p1 ON p1."员工编码" = f."一次诊断所属人工号"
+                    LEFT JOIN ods.person p2 ON p2."员工编码" = f."二次诊断所属人工号"
+                    LEFT JOIN ods.person p3 ON p3."员工编码" = f."返工所属人工号"
+                    LEFT JOIN ods.person p4 ON p4."员工编码" = f."验收所属人工号"
+            """
+        ).fetchdf()
+        # 单据的责任单位分布
+        flow_operation_responsibilities: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    alei."单据编号",
+                    alei."责任单位"
+                FROM ods.alignment_error_initiate alei
+                WHERE NOT alei."责任单位" IS NULL
+            """
+        ).fetchdf()
+        # 单据的异常构型分布
+        flow_operation_configuration: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    alei."单据编号",
+                    COALESCE(alei."构型名称", alei."下推构型项名称") AS "构型分类"
+                FROM ods.alignment_error_initiate alei
+                WHERE NOT COALESCE(alei."构型名称", alei."下推构型项名称") IS NULL
+            """
+        ).fetchdf()
+        # 单据的所属项目分布
+        flow_operation_project: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    aleh."单据编号",
+                    COALESCE(aleh."项目简称", aleh."项目名称") AS "项目名称"
+                FROM ods.alignment_error_handle aleh
+            """
+        ).fetchdf()
+        # 单据的所属项目分布
+        flow_operation_reason: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    alei."单据编号",
+                    alei."失效原因"
+                FROM ods.alignment_error_initiate alei
+                WHERE NOT alei."失效原因" IS NULL
+            """
+        ).fetchdf()
+
         # 校线异常相关明细
         self.connect.sql(
             f"""
                 CREATE OR REPLACE TABLE dwd.ontime_final_result AS 
                     SELECT 
                         f0."单据编码",
+                        f3."责任单位",
+                        f4."构型分类",
+                        f5."项目名称",
+                        f6."失效原因",
+
                         f0."响应计算起始时间",
                         f0."预计及时响应时间",
                         f0."实际响应时间",
                         f0."响应用时",
                         f0."是否及时响应",
+                        f2."响应所属组室",
 
                         f1."一次诊断计算起始时间",
                         f1."预计及时一次诊断时间",
                         f1."实际一次诊断时间",
                         f1."一次诊断用时",
                         f1."是否及时一次诊断",
+                        f2."一次诊断所属组室",
 
                         f1."实际一次诊断时间" AS "二次诊断计算起始时间",
                         f1."预计及时二次诊断时间",
                         f1."实际二次诊断时间",
                         f1."二次诊断用时",
                         f1."是否及时二次诊断",
+                        f2."二次诊断所属组室",
 
                         f1."实际二次诊断时间" AS "返工计算起始时间",
                         f1."预计及时返工时间",
                         f1."实际返工时间",
                         f1."返工用时",
                         f1."是否及时返工",
+                        f2."返工所属组室",
 
                         f1."实际返工时间" AS "验收计算起始时间",
                         f1."预计及时验收时间",
                         f1."实际验收时间",
                         f1."验收用时",
-                        f1."是否及时验收"
+                        f1."是否及时验收",
+                        f2."验收所属组室"
                     FROM flow_operation_handle f0 
                     FULL JOIN flow_operation_initiate f1 ON f0."单据编码" = f1."单据编码"
+                    LEFT JOIN flow_operation_department f2 ON f0."单据编码" = f2."单据编号"
+                    LEFT JOIN flow_operation_responsibilities f3 ON f0."单据编码" = f3."单据编号"
+                    LEFT JOIN flow_operation_configuration f4 ON f0."单据编码" = f4."单据编号"
+                    LEFT JOIN flow_operation_project f5 ON f0."单据编码" = f5."单据编号"
+                    LEFT JOIN flow_operation_reason f6 ON f0."单据编码" = f6."单据编号"
             """
         )
         # 前端上最上面那一排指标卡片的数据
@@ -500,7 +586,8 @@ class alignment_error_process(process):
             "返工进行中流程数": 3,
             "验收进行中流程数": 4,
         }
-        def temp_make_json(title_name: str, real_time_name: str, start_time_name: str, use_time_name: str, request_time_name: str) -> dict[str, Any]:
+
+        def make_json_head(title_name: str, real_time_name: str, start_time_name: str, use_time_name: str, request_time_name: str) -> dict[str, Any]:
             in_process = self.connect.sql(
                 f"""
                     SELECT 
@@ -521,16 +608,99 @@ class alignment_error_process(process):
             trend = 'ontime' if request_value > average_value else 'overtime'
             return {
                 "index": temp_map[title_name],
-                "title_name" : title_name,
+                "title_name": title_name,
                 "trend": trend,
                 "request_value": in_process,
                 "request_time": request_value,
                 "average_time": average_value,
             }
         calibration_line_total_data = [
-            temp_make_json("未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
-            temp_make_json("一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
-            temp_make_json("二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
-            temp_make_json("返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
-            temp_make_json("验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
+            make_json_head("未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
+            make_json_head("一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
+            make_json_head("二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
+            make_json_head("返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
+            make_json_head("验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
+        ]
+        # 中间几个用于显示占比的卡片
+        def make_json_center(title_name: str, colunms_name: str) -> dict[str, Any]:
+            temp_data: pd.DataFrame = self.connect.sql(
+                f"""
+                    SELECT 
+                        bill."{colunms_name}" AS "label",
+                        COUNT(bill."单据编码") AS "value",
+                    FROM dwd.ontime_final_result bill
+                    WHERE NOT bill."{colunms_name}" IS NULL 
+                        AND bill."响应计算起始时间" >= date_trunc('month', current_timestamp) 
+                """
+            ).fetchdf()
+            temp_res_data = []
+            for index, row in temp_data.iterrows():
+                temp_res_data.append(
+                    {
+                        "label": row["label"],
+                        "value": row["value"],
+                    }
+                )
+            return {
+                "title_name": title_name,
+                "data": temp_res_data,
+            }
+        pie_chart_error_data = [
+            make_json_center("本月异常构型组成", "构型分类"),
+            make_json_center("本月异常项目占比", "项目名称"),
+            make_json_center("本月异常责任单位占比", "责任单位"),
+            make_json_center("本月异常类型组成", "失效原因"),
+        ]
+        # 下面几个用于显示及时率的卡片
+        def make_json_back(title_name: str, colunms_start: str, colunms_or_not: str,colunms_group: str) -> dict[str, Any]:
+            temp_data: pd.DataFrame = self.connect.sql(
+                f"""
+                    SELECT 
+                        bill."{colunms_group}" AS "group_name",
+                        SUM(
+                            CASE bill."{colunms_or_not}" 
+                                WHEN '未及时'
+                                THEN 0
+                                WHEN '及时'
+                                THEN 1
+                                ELSE 0
+                            END
+                        ) AS "ontime_value",
+                        SUM(
+                            CASE bill."{colunms_or_not}" 
+                                WHEN '未及时'
+                                THEN 1
+                                WHEN '及时'
+                                THEN 1
+                                ELSE 0
+                            END
+                        ) AS "total_value"
+                    FROM dwd.ontime_final_result bill
+                    WHERE NOT bill."{colunms_start}" IS NULL AND bill."{colunms_start}" >= date_trunc('month', current_timestamp)
+                """
+            ).fetchdf()
+            temp_res_data = []
+            temp_trend = 0
+            for index, row in temp_data.iterrows():
+                temp_trend += row["ontime_value"] / row["total_value"] if row["total_value"] != 0 else 0
+                temp_res_data.append(
+                    {
+                        "group_name": row["group_name"],
+                        "ontime_value": row["ontime_value"],
+                        "total_value": row["total_value"],
+                    }
+                )
+            temp_trend = temp_trend / len(temp_res_data)
+            trend = 'inlimit' if temp_trend >= self.on_time_norms else 'overlimit'
+            return {
+                "title_name": title_name,
+                "trend": trend,
+                "group": temp_res_data,
+            }
+        pie_chart_error_data = [
+            make_json_back("异常响应及时率", "响应计算起始时间", "是否及时响应", "响应所属组室"),
+            make_json_back("一次诊断及时率", "一次诊断计算起始时间", "是否及时一次诊断", "一次诊断所属组室"),
+            make_json_back("二次诊断及时率", "二次诊断计算起始时间", "是否及时二次诊断", "二次诊断所属组室"),
+            make_json_back("返工及时率", "返工计算起始时间", "是否及时返工", "返工所属组室"),
+            make_json_back("验收及时率", "验收计算起始时间", "是否及时验收", "验收所属组室"),
         ]
