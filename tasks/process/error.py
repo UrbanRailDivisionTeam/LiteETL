@@ -697,10 +697,25 @@ class alignment_error_process(process):
                 "trend": trend,
                 "group": temp_res_data,
             }
-        pie_chart_error_data = [
+        calibration_line_group_data = [
             make_json_back("异常响应及时率", "响应计算起始时间", "是否及时响应", "响应所属组室"),
             make_json_back("一次诊断及时率", "一次诊断计算起始时间", "是否及时一次诊断", "一次诊断所属组室"),
             make_json_back("二次诊断及时率", "二次诊断计算起始时间", "是否及时二次诊断", "二次诊断所属组室"),
             make_json_back("返工及时率", "返工计算起始时间", "是否及时返工", "返工所属组室"),
             make_json_back("验收及时率", "验收计算起始时间", "是否及时验收", "验收所属组室"),
         ]
+        # 写入数据库
+        collection = self.mongo["liteweb"]["calibration_line_total_data"]
+        with self.mongo.start_session() as session:
+            collection = self.mongo["liteweb"]["calibration_line_total_data"]
+            with session.start_transaction():
+                collection.delete_many({}, session=session)
+                collection.insert_many(calibration_line_total_data, session=session)
+            collection = self.mongo["liteweb"]["pie_chart_error_data"]
+            with session.start_transaction():
+                collection.delete_many({}, session=session)
+                collection.insert_many(pie_chart_error_data, session=session)
+            collection = self.mongo["liteweb"]["calibration_line_group_data"]
+            with session.start_transaction():
+                collection.delete_many({}, session=session)
+                collection.insert_many(calibration_line_group_data, session=session)
