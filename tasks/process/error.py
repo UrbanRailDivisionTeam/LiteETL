@@ -630,7 +630,8 @@ class alignment_error_process(process):
                         COUNT(bill."单据编码") AS "value",
                     FROM dwd.ontime_final_result bill
                     WHERE NOT bill."{colunms_name}" IS NULL 
-                        AND bill."响应计算起始时间" >= date_trunc('month', current_timestamp) 
+                        AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)  
+                    GROUP BY bill."{colunms_name}"
                 """
             ).fetchdf()
             temp_res_data = []
@@ -676,7 +677,9 @@ class alignment_error_process(process):
                             END
                         ) AS "total_value"
                     FROM dwd.ontime_final_result bill
-                    WHERE NOT bill."{colunms_start}" IS NULL AND bill."{colunms_start}" >= date_trunc('month', current_timestamp)
+                    WHERE NOT bill."{colunms_start}" IS NULL 
+                        AND bill."{colunms_start}" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+                    GROUP BY bill."{colunms_group}"
                 """
             ).fetchdf()
             temp_res_data = []
@@ -708,14 +711,11 @@ class alignment_error_process(process):
         collection = self.mongo["liteweb"]["calibration_line_total_data"]
         with self.mongo.start_session() as session:
             collection = self.mongo["liteweb"]["calibration_line_total_data"]
-            with session.start_transaction():
-                collection.delete_many({}, session=session)
-                collection.insert_many(calibration_line_total_data, session=session)
+            collection.drop(session=session)
+            collection.insert_many(calibration_line_total_data, session=session)
             collection = self.mongo["liteweb"]["pie_chart_error_data"]
-            with session.start_transaction():
-                collection.delete_many({}, session=session)
-                collection.insert_many(pie_chart_error_data, session=session)
+            collection.drop(session=session)
+            collection.insert_many(pie_chart_error_data, session=session)
             collection = self.mongo["liteweb"]["calibration_line_group_data"]
-            with session.start_transaction():
-                collection.delete_many({}, session=session)
-                collection.insert_many(calibration_line_group_data, session=session)
+            collection.drop(session=session)
+            collection.insert_many(calibration_line_group_data, session=session)
