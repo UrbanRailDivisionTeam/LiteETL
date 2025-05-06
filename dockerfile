@@ -1,5 +1,5 @@
 # 使用官方的基础镜像
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+FROM ghcr.io/astral-sh/uv:python3.12-alpine
 
 # 更新 apk 软件包索引并安装必要的依赖
 RUN apk update && apk add --no-cache \
