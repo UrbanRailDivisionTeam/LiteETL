@@ -1,6 +1,5 @@
 import os
 from utils import read_sql
-from utils.config import DEBUG
 from utils.connect import connect_data
 from tasks.sync import init_warpper
 from tasks.base import task, extract_increase, extract_increase_data, extract, extract_data
@@ -13,7 +12,7 @@ def init(connect_data: connect_data) -> list[task]:
             extract_increase_data(
                 name="考勤节假日数据抽取",
                 logger_name="attendance_kq_scheduling_holiday",
-                source="考勤系统" if not DEBUG else "oracle服务",
+                source="考勤系统",
                 source_sync_sql=read_sql(os.path.join("attendance", "kq_scheduling_holiday", "sync", "kq_scheduling_holiday.sql")),
                 source_increase_sql=read_sql(os.path.join("attendance", "kq_scheduling_holiday", "increase", "kq_scheduling_holiday_source.sql")),
                 target_table="attendance_kq_scheduling_holiday",
@@ -25,7 +24,7 @@ def init(connect_data: connect_data) -> list[task]:
             extract_data(
                 name="考勤数据抽取",
                 logger_name="attendance_kq_time",
-                source="考勤系统" if not DEBUG else "oracle服务",
+                source="考勤系统",
                 source_sql=read_sql(os.path.join("attendance", "kq_time.sql")),
                 target_table="attendance_kq_time"
             )
@@ -35,7 +34,7 @@ def init(connect_data: connect_data) -> list[task]:
             extract_data(
                 name="考勤类型数据抽取",
                 logger_name="attendance_kq_type",
-                source="考勤系统" if not DEBUG else "oracle服务",
+                source="考勤系统",
                 source_sql=read_sql(os.path.join("attendance", "kq_type.sql")),
                 target_table="attendance_kq_type"
             )

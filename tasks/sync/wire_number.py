@@ -1,6 +1,5 @@
 import os
 from utils import read_sql
-from utils.config import DEBUG
 from utils.connect import connect_data
 from tasks.sync import init_warpper
 from tasks.base import task, extract_increase, extract_increase_data
@@ -15,7 +14,7 @@ def init(connect_data: connect_data) -> list[task]:
             extract_increase_data(
                 name="线号标签申请上下标数据抽取",
                 logger_name="wire_number_head",
-                source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+                source="金蝶云苍穹-正式库" ,
                 source_sync_sql=read_sql(os.path.join("wire_number", "head", "sync", "wire_number_head.sql")),
                 source_increase_sql=read_sql(os.path.join("wire_number", "head", "increase", "wire_number_head_source.sql")),
                 target_table="wire_number_head",
@@ -27,7 +26,7 @@ def init(connect_data: connect_data) -> list[task]:
             extract_increase_data(
                 name="线号标签申请位置号数据抽取",
                 logger_name="wire_number_entry",
-                source="金蝶云苍穹-正式库" if not DEBUG else "mysql服务",
+                source="金蝶云苍穹-正式库" ,
                 source_sync_sql=read_sql(os.path.join("wire_number", "entry", "sync", "wire_number_entry.sql")),
                 source_increase_sql=read_sql(os.path.join("wire_number", "entry", "increase", "wire_number_entry_source.sql")),
                 target_table="wire_number_entry",
