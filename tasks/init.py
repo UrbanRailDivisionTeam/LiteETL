@@ -68,4 +68,3 @@ def task_init(connect_data: connect_data) -> list[task]:
         .dp(gp["考勤节假日数据抽取"])\
         .dp(gp["人员基础数据抽取"])
     return list(gp.values())
-        
