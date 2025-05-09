@@ -516,11 +516,26 @@ class alignment_error_process(process):
         # 单据的所属项目分布
         flow_operation_reason: pd.DataFrame = self.connect.sql(
             f"""
-                SELECT
-                    alei."单据编号",
-                    alei."失效原因"
-                FROM ods.alignment_error_initiate alei
-                WHERE NOT alei."失效原因" IS NULL
+                WITH temp_reason AS (
+                    SELECT
+                        alei."单据编号",
+                        alei."失效原因"
+                    FROM ods.alignment_error_initiate alei
+                    WHERE NOT alei."失效原因" IS NULL
+                )
+                SELECT 
+                    bill."单据编号",
+                    CASE
+                        WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[0]
+                        WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[0]
+                        ELSE bill."失效原因"
+                    END AS "失效原因_一级",
+                    CASE
+                        WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[1]
+                        WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[1]
+                        ELSE ''
+                    END AS "失效原因_二级"
+                FROM temp_reason bill
             """
         ).fetchdf()
 
@@ -533,7 +548,8 @@ class alignment_error_process(process):
                         f3."责任单位",
                         f4."构型分类",
                         f5."项目名称",
-                        f6."失效原因",
+                        f6."失效原因_一级",
+                        f6."失效原因_二级",
 
                         f0."响应计算起始时间",
                         f0."预计及时响应时间",
@@ -621,6 +637,12 @@ class alignment_error_process(process):
             make_json_head("返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
             make_json_head("验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
         ]
+        temp_map = {
+            "本月异常构型组成": 0,
+            "本月异常项目占比": 1,
+            "本月异常责任单位占比": 2,
+            # "本月异常类型组成": 3,
+        }
         # 中间几个用于显示占比的卡片
         def make_json_center(title_name: str, colunms_name: str) -> dict[str, Any]:
             temp_data: pd.DataFrame = self.connect.sql(
@@ -643,15 +665,32 @@ class alignment_error_process(process):
                     }
                 )
             return {
+                "index" : temp_map[title_name],
                 "title_name": title_name,
                 "data": temp_res_data,
             }
-        pie_chart_error_data = [
+        pie_chart_no_error_data = [
             make_json_center("本月异常构型组成", "构型分类"),
             make_json_center("本月异常项目占比", "项目名称"),
             make_json_center("本月异常责任单位占比", "责任单位"),
-            make_json_center("本月异常类型组成", "失效原因"),
         ]
+        # 失效原因单列一行
+        def make_json_center_2():
+            temp_data: pd.DataFrame = self.connect.sql(
+                f"""
+                    SELECT 
+                        bill."失效原因_一级" AS "label",
+                    FROM dwd.ontime_final_result bill
+                    WHERE NOT bill."失效原因_一级" IS NULL 
+                        AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)  
+                """
+            ).fetchdf()
+            for index, ch in temp_data.iterrows():
+                make_json_center(ch["label"], ch["label"])
+                
+            
+        
+        
         # 下面几个用于显示及时率的卡片
         def make_json_back(title_name: str, colunms_start: str, colunms_or_not: str,colunms_group: str) -> dict[str, Any]:
             temp_data: pd.DataFrame = self.connect.sql(
@@ -713,9 +752,9 @@ class alignment_error_process(process):
             collection = self.mongo["liteweb"]["calibration_line_total_data"]
             collection.drop(session=session)
             collection.insert_many(calibration_line_total_data, session=session)
-            collection = self.mongo["liteweb"]["pie_chart_error_data"]
+            collection = self.mongo["liteweb"]["pie_chart_no_error_data"]
             collection.drop(session=session)
-            collection.insert_many(pie_chart_error_data, session=session)
+            collection.insert_many(pie_chart_no_error_data, session=session)
             collection = self.mongo["liteweb"]["calibration_line_group_data"]
             collection.drop(session=session)
             collection.insert_many(calibration_line_group_data, session=session)

@@ -33,8 +33,40 @@ class config:
 
 
 CONFIG = config(
-    MONGO_IP = "mongo",
+    MONGO_IP = "10.29.1.242",
     CONNECT={
+        "相关方数据库": connect_config(
+            dbtype="pgsql",
+            ip="18.0.163.64",
+            port=10086,
+            user="postgres",
+            password="Swq8855830.",
+            database="postgres"
+        ),
+        "BI与数开用数据库": connect_config(
+            dbtype="mysql",
+            ip="10.24.5.32",
+            port=3306,
+            user="cheakf",
+            password="Swq8855830.",
+            database="dataframe_flow_v2"
+        ),
+        "BI与数开用数据库_旧": connect_config(
+            dbtype="mysql",
+            ip="10.24.5.32",
+            port=3306,
+            user="cheakf",
+            password="Swq8855830.",
+            database="dataframe_flow"
+        ),
+        "BI与数开用数据库_供应商": connect_config(
+            dbtype="mysql",
+            ip="10.24.5.32",
+            port=3306,
+            user="cheakf",
+            password="Swq8855830.",
+            database="supplier_use"
+        ),
         "EAS": connect_config(
             dbtype="oracle",
             ip="172.18.1.121",

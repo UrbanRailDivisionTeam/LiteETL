@@ -40,7 +40,7 @@ def task_init(connect_data: connect_data) -> list[task]:
         attendance.init(connect_data),
         business_connection.init(connect_data),
         error.init(connect_data),
-        # interested_party.init(connect_data),
+        interested_party.init(connect_data),
         person.init(connect_data),
         wire_number.init(connect_data),
         work_time.init(connect_data),
@@ -57,7 +57,7 @@ def task_init(connect_data: connect_data) -> list[task]:
     # 用于任务类相关关系定义
     gp["全员型改善数据分析"].dp(gp["改善数据抽取"]).dp(gp["人员基础数据抽取"])
     gp["线号标签申请数据处理"].dp(gp["线号标签申请上下标数据抽取"]).dp(gp["线号标签申请位置号数据抽取"])
-    # gp["相关方数据处理"].dp(gp["相关方安全数据抽取"]).dp(gp["相关方安全随行人员数据抽取"])
+    gp["相关方数据处理"].dp(gp["相关方审批数据同步"])
     gp["校线异常数据处理"]\
         .dp(gp["校线异常发起单数据抽取"])\
         .dp(gp["校线异常处理单数据抽取"])\
