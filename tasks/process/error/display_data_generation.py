@@ -1,6 +1,5 @@
 import duckdb
 import datetime
-import functools
 import pandas as pd
 from typing import Any
 
@@ -20,19 +19,19 @@ def make_json_head(
     '''
     in_process = connect.sql(
         f"""
-                    SELECT 
-                        COUNT(bill."单据编码")
-                    FROM dwd.ontime_final_result bill
-                    WHERE bill."{real_time_name}" IS NULL AND NOT bill."{start_time_name}" IS NULL
-                """
+            SELECT 
+                COUNT(bill."单据编码")
+            FROM dwd.ontime_final_result bill
+            WHERE bill."{real_time_name}" IS NULL AND NOT bill."{start_time_name}" IS NULL
+        """
     ).fetchall()[0][0]
     average_value = connect.sql(
         f"""
-                    SELECT 
-                        SUM(epoch(bill."{use_time_name}") / 60) / COUNT(bill."单据编码")
-                    FROM dwd.ontime_final_result bill
-                    WHERE NOT bill."{use_time_name}" IS NULL
-                """
+            SELECT 
+                SUM(epoch(bill."{use_time_name}") / 60) / COUNT(bill."单据编码")
+            FROM dwd.ontime_final_result bill
+            WHERE NOT bill."{use_time_name}" IS NULL
+        """
     ).fetchall()[0][0]
     request_value = int(request_time[request_time_name].total_seconds() / 60)
     trend = 'ontime' if request_value > average_value else 'overtime'
@@ -142,11 +141,35 @@ def make_json_back(
 
 def make_json_reason(
     connect: duckdb.DuckDBPyConnection,
+    type_name: str,
 ) -> dict[str, Any]:
     '''
     构建中间显示失效原因的数据
     '''
-    ...
+    temp_data: pd.DataFrame = connect.sql(
+        f"""
+            SELECT
+                bill."失效原因_二级" AS "label",
+                COUNT(bill."单据编码") AS "value"
+            FROM dwd.ontime_final_result bill
+            WHERE NOT bill."失效原因_一级" IS NULL
+                AND bill."失效原因_一级" = '{type_name}'
+                AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+            GROUP BY bill."失效原因_二级"
+        """
+    ).fetchdf()
+    return {
+        # 这里的顺序不重要，仅按照类型匹配要求随机赋值
+        'index': len(type_name),
+        'titele_name': type_name + '导致的异常',
+        'data': [
+            {
+                'label': ch['label'],
+                'value': ch['value']
+            }
+            for index, ch in temp_data.iterrows()
+        ]
+    }
 
 
 def process(
@@ -156,47 +179,62 @@ def process(
     center_map: dict[str, int],
     on_time_norms: float
 ) -> dict[str, list[dict[str, Any]]]:
-    __make_json_head = functools.partial(make_json_head, connect=connect, request_time=request_time, head_map=head_map)
     calibration_line_total_data = [
-        __make_json_head("未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
-        __make_json_head("一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
-        __make_json_head("二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
-        __make_json_head("返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
-        __make_json_head("验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
+        make_json_head(connect, request_time, head_map, "未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
+        make_json_head(connect, request_time, head_map, "一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
+        make_json_head(connect, request_time, head_map, "二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
+        make_json_head(connect, request_time, head_map, "返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
+        make_json_head(connect, request_time, head_map, "验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
     ]
     # 中间几个用于显示占比的卡片
-    __make_json_center = functools.partial(make_json_center, connect=connect, center_map=center_map)
     pie_chart_no_error_data = [
-        __make_json_center("本月异常构型组成", "构型分类"),
-        __make_json_center("本月异常项目占比", "项目名称"),
-        __make_json_center("本月异常责任单位占比", "责任单位"),
+        make_json_center(connect, center_map, "本月异常构型组成", "构型分类"),
+        make_json_center(connect, center_map, "本月异常项目占比", "项目名称"),
+        make_json_center(connect, center_map, "本月异常责任单位占比", "责任单位"),
     ]
     # 失效原因单列一个模块
-    __make_json_center = functools.partial(make_json_reason, connect=connect)
+    temp_data: pd.DataFrame = connect.sql(
+        f"""
+            SELECT
+                bill."失效原因_一级" AS "label",
+            FROM dwd.ontime_final_result bill
+            WHERE NOT bill."失效原因_一级" IS NULL AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+        """
+    ).fetchdf()
     pie_chart_error_data = [
-
+        make_json_reason(connect, ch['label']) for index, ch in temp_data.iterrows()
     ]
-    # def make_json_center_2():
-    #     temp_data: pd.DataFrame = self.connect.sql(
-    #         f"""
-    #                 SELECT
-    #                     bill."失效原因_一级" AS "label",
-    #                 FROM dwd.ontime_final_result bill
-    #                 WHERE NOT bill."失效原因_一级" IS NULL
-    #                     AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-    #             """
-    #     ).fetchdf()
-    #     for index, ch in temp_data.iterrows():
-    #         make_json_center(ch["label"], ch["label"])
+    # 生成一个整体的数据
+    temp_data: pd.DataFrame = connect.sql(
+        f"""
+            SELECT
+                bill."失效原因_一级" AS "label",
+                COUNT(bill."单据编码") AS "value"
+            FROM dwd.ontime_final_result bill
+            WHERE NOT bill."失效原因_一级" IS NULL
+                AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+            GROUP BY bill."失效原因_一级"
+        """
+    ).fetchdf()
+    pie_chart_error_data.append({
+        'index': 0,
+        'titele_name': '本月异常构型组成',
+        'data': [
+            {
+                'label': ch['label'],
+                'value': ch['value']
+            }
+            for index, ch in temp_data.iterrows()
+        ]
+    })
 
     # 下面几个用于显示及时率的卡片
-    __make_json_back = functools.partial(make_json_back, connect=connect, on_time_norms=on_time_norms)
     calibration_line_group_data = [
-        __make_json_back("异常响应及时率", "响应计算起始时间", "是否及时响应", "响应所属组室"),
-        __make_json_back("一次诊断及时率", "一次诊断计算起始时间", "是否及时一次诊断", "一次诊断所属组室"),
-        __make_json_back("二次诊断及时率", "二次诊断计算起始时间", "是否及时二次诊断", "二次诊断所属组室"),
-        __make_json_back("返工及时率", "返工计算起始时间", "是否及时返工", "返工所属组室"),
-        __make_json_back("验收及时率", "验收计算起始时间", "是否及时验收", "验收所属组室"),
+        make_json_back(connect, on_time_norms, "异常响应及时率", "响应计算起始时间", "是否及时响应", "响应所属组室"),
+        make_json_back(connect, on_time_norms, "一次诊断及时率", "一次诊断计算起始时间", "是否及时一次诊断", "一次诊断所属组室"),
+        make_json_back(connect, on_time_norms, "二次诊断及时率", "二次诊断计算起始时间", "是否及时二次诊断", "二次诊断所属组室"),
+        make_json_back(connect, on_time_norms, "返工及时率", "返工计算起始时间", "是否及时返工", "返工所属组室"),
+        make_json_back(connect, on_time_norms, "验收及时率", "验收计算起始时间", "是否及时验收", "验收所属组室"),
     ]
     return {
         'calibration_line_total_data': calibration_line_total_data,

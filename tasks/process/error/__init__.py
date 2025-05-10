@@ -1,7 +1,7 @@
 import datetime
 from tasks.process import process
+from tasks.process.error import detailed_calculations, display_data_generation
 from utils.connect import connect_data
-from process.error import detailed_calculations, display_data_generation
 
 
 class alignment_error_process(process):
@@ -62,9 +62,24 @@ class alignment_error_process(process):
             collection = self.mongo["liteweb"]["calibration_line_total_data"]
             collection.drop(session=session)
             collection.insert_many(collection_data['calibration_line_total_data'], session=session)
+            
             collection = self.mongo["liteweb"]["pie_chart_no_error_data"]
             collection.drop(session=session)
             collection.insert_many(collection_data['pie_chart_no_error_data'], session=session)
+            
+            collection = self.mongo["liteweb"]["pie_chart_error_data"]
+            collection.drop(session=session)
+            collection.insert_many(collection_data['pie_chart_error_data'], session=session)
+            
             collection = self.mongo["liteweb"]["calibration_line_group_data"]
             collection.drop(session=session)
             collection.insert_many(collection_data['calibration_line_group_data'], session=session)
+            
+            # 更新更新时间记录
+            collection = self.mongo["liteweb"]["update_time"]
+            collection.delete_one({'name':'calibration_line'}, session=session)
+            collection.insert_one({
+                'name':'collection',
+                'time':datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }, session=session)
+            

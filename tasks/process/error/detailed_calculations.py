@@ -1,8 +1,7 @@
 import duckdb
 import datetime
-import functools
 import pandas as pd
-from process.error.time_process import specialization_judje_time, specialization_judje_time_inverse, judge_on_time
+from tasks.process.error.time_process import specialization_judje_time, specialization_judje_time_inverse, judge_on_time
 
 
 def process(
@@ -21,9 +20,6 @@ def process(
     specialization_name：一些经常会更改的关键名称
     commuting_time：工作日的上下班时间
     '''
-    __specialization_judje_time = functools.partial(specialization_judje_time, connect=connect, commuting_time=commuting_time)
-    __specialization_judje_time_inverse = functools.partial(specialization_judje_time_inverse, connect=connect, commuting_time=commuting_time)
-
     # 申请单及时相关计算
     flow_operation_handle: pd.DataFrame = connect.sql(
         f'''
@@ -96,8 +92,8 @@ def process(
     ).fetchdf()
 
     def temp_apply_handle(row: pd.Series) -> pd.Series:
-        row["预计及时响应时间"] = __specialization_judje_time(row["响应计算起始时间"], request_time["响应"])
-        row["响应用时"] = __specialization_judje_time_inverse(row["响应计算起始时间"], row["实际响应时间"])
+        row["预计及时响应时间"] = specialization_judje_time(connect, commuting_time, row["响应计算起始时间"], request_time["响应"])
+        row["响应用时"] = specialization_judje_time_inverse(connect, commuting_time, row["响应计算起始时间"], row["实际响应时间"])
         row["是否及时响应"] = judge_on_time(row["预计及时响应时间"], row["实际响应时间"])
         return row
     flow_operation_handle = flow_operation_handle.apply(temp_apply_handle, axis=1)
@@ -178,20 +174,21 @@ def process(
     ).fetchdf()
 
     def temp_apply_initiate(row: pd.Series) -> pd.Series:
-        row["预计及时一次诊断时间"] = __specialization_judje_time(row["一次诊断计算起始时间"], request_time["一次诊断"])
-        row["一次诊断用时"] = __specialization_judje_time_inverse(row["一次诊断计算起始时间"], row["实际一次诊断时间"])
+        # 移除input_time=参数名，直接传递位置参数
+        row["预计及时一次诊断时间"] = specialization_judje_time(connect, commuting_time, row["一次诊断计算起始时间"], request_time["一次诊断"])
+        row["一次诊断用时"] = specialization_judje_time_inverse(connect, commuting_time, row["一次诊断计算起始时间"], row["实际一次诊断时间"])
         row["是否及时一次诊断"] = judge_on_time(row["预计及时一次诊断时间"], row["实际一次诊断时间"])
 
-        row["预计及时二次诊断时间"] = __specialization_judje_time(row["实际一次诊断时间"], request_time["二次诊断"])
-        row["二次诊断用时"] = __specialization_judje_time_inverse(row["实际一次诊断时间"], row["实际二次诊断时间"])
+        row["预计及时二次诊断时间"] = specialization_judje_time(connect, commuting_time, row["实际一次诊断时间"], request_time["二次诊断"])
+        row["二次诊断用时"] = specialization_judje_time_inverse(connect, commuting_time, row["实际一次诊断时间"], row["实际二次诊断时间"])
         row["是否及时二次诊断"] = judge_on_time(row["预计及时二次诊断时间"], row["实际二次诊断时间"])
 
-        row["预计及时返工时间"] = __specialization_judje_time(row["实际二次诊断时间"], request_time["返工"])
-        row["返工用时"] = __specialization_judje_time_inverse(row["实际二次诊断时间"], row["实际返工时间"])
+        row["预计及时返工时间"] = specialization_judje_time(connect, commuting_time, row["实际二次诊断时间"], request_time["返工"])
+        row["返工用时"] = specialization_judje_time_inverse(connect, commuting_time, row["实际二次诊断时间"], row["实际返工时间"])
         row["是否及时返工"] = judge_on_time(row["预计及时返工时间"], row["实际返工时间"])
 
-        row["预计及时验收时间"] = __specialization_judje_time(row["实际返工时间"], request_time["验收"])
-        row["验收用时"] = __specialization_judje_time_inverse(row["实际返工时间"], row["实际验收时间"])
+        row["预计及时验收时间"] = specialization_judje_time(connect, commuting_time, row["实际返工时间"], request_time["验收"])
+        row["验收用时"] = specialization_judje_time_inverse(connect, commuting_time, row["实际返工时间"], row["实际验收时间"])
         row["是否及时验收"] = judge_on_time(row["预计及时验收时间"], row["实际验收时间"])
         return row
     flow_operation_initiate = flow_operation_initiate.apply(temp_apply_initiate, axis=1)
