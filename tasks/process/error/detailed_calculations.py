@@ -263,13 +263,13 @@ def process(
             SELECT 
                 bill."单据编号",
                 CASE
-                    WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[0]
-                    WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[0]
+                    WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[1]
+                    WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[1]
                     ELSE bill."失效原因"
                 END AS "失效原因_一级",
                 CASE
-                    WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[1]
-                    WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[1]
+                    WHEN INSTR(bill."失效原因", '.') > 0 THEN STRING_SPLIT(bill."失效原因", '.')[2]
+                    WHEN INSTR(bill."失效原因", '_') > 0 THEN STRING_SPLIT(bill."失效原因", '_')[2]
                     ELSE ''
                 END AS "失效原因_二级"
             FROM temp_reason bill

@@ -196,9 +196,12 @@ def process(
     temp_data: pd.DataFrame = connect.sql(
         f"""
             SELECT
+                DISTINCT 
                 bill."失效原因_一级" AS "label",
             FROM dwd.ontime_final_result bill
-            WHERE NOT bill."失效原因_一级" IS NULL AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+            WHERE NOT bill."失效原因_一级" IS NULL 
+                AND TRIM(bill."失效原因_一级") <> ''
+                AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
         """
     ).fetchdf()
     pie_chart_error_data = [
