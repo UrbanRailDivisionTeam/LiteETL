@@ -161,7 +161,7 @@ def make_json_reason(
     return {
         # 这里的顺序不重要，仅按照类型匹配要求随机赋值
         'index': len(type_name),
-        'titele_name': type_name + '导致的异常',
+        'title_name': type_name + '导致的异常',
         'data': [
             {
                 'label': ch['label'],
@@ -221,7 +221,7 @@ def process(
     ).fetchdf()
     pie_chart_error_data.append({
         'index': 0,
-        'titele_name': '本月异常构型组成',
+        'title_name': '本月异常构型组成',
         'data': [
             {
                 'label': ch['label'],
