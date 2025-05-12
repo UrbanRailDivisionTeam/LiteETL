@@ -19,6 +19,8 @@ select
     change_user.fnumber as "整改人工号",
     change_user.FTRUENAME as "整改人姓名",
     bill.fk_crrc_textfield5 as "整改班组",
+    rework_execution_user.fnumber AS "返工执行人工号",
+    rework_execution_user.FTRUENAME AS "返工执行人姓名",
     create_user.fnumber as "提报人工号",
     create_user.FTRUENAME as "提报人姓名",
     gxx1.fname as "下推构型项名称",
@@ -61,3 +63,4 @@ FROM
     LEFT JOIN crrc_secd.tk_crrc_gxx gxx1 on bill.fk_crrc_gxnumber1 = gxx1.fid
     LEFT JOIN crrc_sys.t_sec_user diagnosis_user ON bill.fk_crrc_userfield2 = diagnosis_user.fid
     LEFT JOIN crrc_sys.t_sec_user deliver_user ON bill.fk_crrc_userfield3 = deliver_user.fid
+    LEFT JOIN crrc_sys.t_sec_user rework_execution_user ON bill.fcreatorid = rework_execution_user.fid

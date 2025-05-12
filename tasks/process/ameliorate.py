@@ -64,11 +64,15 @@ class ameliorate_process(process):
                     temp_sub["target"] = int(ch["提交指标"])
                     temp["sub"].append(temp_sub)
             data_template.append(temp)
-        m_collection = self.mongo["lite_web"]["staff_improvement_analysis"]
-        m_collection.delete_many({})
-        m_collection.insert_many(data_template)
-        
-        m_collection = self.mongo["lite_web"]["staff_improvement_data"]
-        m_collection.delete_many({})
-        m_collection.insert_many(data_template)
+            
+        with self.mongo.start_session() as session:
+            collection = self.mongo["liteweb"]["staff_improvement_analysis"]
+            collection.drop(session=session)
+            collection.insert_many(data_template, session=session)
+            
+            collection = self.mongo["liteweb"]["staff_improvement_data"]
+            collection.drop(session=session)
+            collection.insert_many(data_template, session=session)
+            
+            self.update_time('audit_analysis', session=session)
         

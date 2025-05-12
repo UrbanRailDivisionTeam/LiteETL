@@ -199,10 +199,10 @@ def process(
                     SELECT  
                         aleh."单据编号",
                         COALESCE(aleh."响应人工号", aleh."转交人工号", aleh."整改人工号") AS "响应所属人工号",
-                        alei."提报人工号" AS "一次诊断所属人工号",
-                        alei."指定诊断人工号" AS "二次诊断所属人工号",
-                        alei."提报人工号" AS "返工所属人工号",
-                        aleh."提报人工号" AS "验收所属人工号"
+                        alei."返工执行人工号" AS "一次诊断所属人工号",  
+                        alei."指定诊断人工号" AS "二次诊断所属人工号",   
+                        alei."返工执行人工号" AS "返工所属人工号",   
+                        aleh."提报人工号" AS "验收所属人工号" 
                     FROM ods.alignment_error_handle aleh
                     FULL JOIN ods.alignment_error_initiate alei ON aleh."单据编号" = alei."单据编号"
                 )

@@ -57,7 +57,6 @@ class alignment_error_process(process):
         )
             
         # 写入数据库
-        collection = self.mongo["liteweb"]["calibration_line_total_data"]
         with self.mongo.start_session() as session:
             collection = self.mongo["liteweb"]["calibration_line_total_data"]
             collection.drop(session=session)
@@ -75,11 +74,4 @@ class alignment_error_process(process):
             collection.drop(session=session)
             collection.insert_many(collection_data['calibration_line_group_data'], session=session)
             
-            # 更新更新时间记录
-            collection = self.mongo["liteweb"]["update_time"]
-            collection.delete_one({'name':'calibration_line'}, session=session)
-            collection.insert_one({
-                'name':'collection',
-                'time':datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }, session=session)
-            
+            self.update_time('calibration_line', session=session)
