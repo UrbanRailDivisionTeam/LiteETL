@@ -353,7 +353,10 @@ class load_increase(task):
         # 查询需要新增和需要变更的数据写入目标表
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
-
+    
+    def __del__(self) -> None:
+        self.source.close()
+        self.target.close()
 
 @dataclass
 class extract_increase_data:
@@ -431,6 +434,10 @@ class extract_increase(task):
             self.task_del(change_diff)
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
+        
+    def __del__(self) -> None:
+        self.source.close()
+        self.target.close()
 
 
 @dataclass
@@ -517,3 +524,8 @@ class sync_increase(task):
             self.task_del(change_diff)
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
+
+    def __del__(self) -> None:
+        self.local.close()
+        self.source.close()
+        self.target.close()
