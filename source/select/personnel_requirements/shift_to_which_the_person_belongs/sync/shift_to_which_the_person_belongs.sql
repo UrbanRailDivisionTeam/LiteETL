@@ -1,5 +1,7 @@
 SELECT
-    bill.fnumber as "id",
+    bill.fid as "id",
+    bill.fnumber as "单据编码",
+    bill.fmodifytime as "修改时间",
     bill.fname as "班组名称",
     CASE bill.fstatus
         WHEN 'A' THEN '暂存'

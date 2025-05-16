@@ -1,5 +1,6 @@
 SELECT
-    bill.fnumber AS "id",
+    bill.fid AS "id",
+    bill.fnumber AS "单据编码",
     bill.fmodifytime AS "修改时间",
     _user.fnumber AS "工号",
     _user.FTRUENAME AS "姓名",
