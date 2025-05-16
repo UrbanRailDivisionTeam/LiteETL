@@ -20,16 +20,16 @@ class connecter:
             temp = connect_config[ch]
             if temp.dbtype == "oracle":
                 connect_str = "oracle+cx_oracle://" + temp.user + ":" + quote_plus(temp.password) + "@" + temp.ip + ":" + str(temp.port) + "/?service_name=" + temp.database
-                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool, max_overflow=-1, pool_timeout=6000, pool_recycle=3600)
+                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool)
             elif temp.dbtype == "sqlserver":
                 connect_str = "mssql+pyodbc://" + temp.user + ":" + quote_plus(temp.password) + "@" + temp.ip + ":" + str(temp.port) + "/" + temp.database + "?driver=ODBC+Driver+17+for+SQL+Server"
-                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool, max_overflow=-1, pool_timeout=6000, pool_recycle=3600)
+                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool)
             elif temp.dbtype == "mysql":
                 connect_str = "mysql+mysqldb://" + temp.user + ":" + quote_plus(temp.password) + "@" + temp.ip + ":" + str(temp.port) + "/" + temp.database
-                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool, max_overflow=-1, pool_timeout=6000, pool_recycle=3600)
+                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool)
             elif temp.dbtype == "pgsql":
                 connect_str = "postgresql://" + temp.user + ":" + quote_plus(temp.password) + "@" + temp.ip + ":" + str(temp.port) + "/" + temp.database
-                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool, max_overflow=-1, pool_timeout=6000, pool_recycle=3600)
+                self._connect[ch] = sqlalchemy.create_engine(connect_str, poolclass=sqlalchemy.NullPool)
             else:
                 raise ValueError("不支持的数据库类型：" + temp.dbtype)
 
