@@ -46,7 +46,7 @@ class alignment_error_process(process):
             "本月异常责任单位占比": 2,
         }
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         detailed_calculations.process(self.connect, self.request_time, self.specialization_name,self.commuting_time)
         collection_data = display_data_generation.process(
             self.connect, 

@@ -3,7 +3,7 @@ import gc
 import time
 import duckdb
 from concurrent.futures import ThreadPoolExecutor
-from tasks.base import task
+from tasks.base import task, task_status
 from utils.logger import make_logger
 
 
@@ -24,18 +24,18 @@ class executer:
         if len(input_task.depend) == 0:
             return True
         # 已经开始运行不可再次运行
-        if input_task.start_run:
+        if input_task.status != task_status.WAIT:
             return False
         # 检查依赖是否全运行完成，全运行完成可以运行
         for _tasks in self.task_list:
-            if _tasks.name in input_task.depend and not _tasks.end_run:
+            if _tasks.name in input_task.depend and _tasks.status != task_status.END:
                 return False
         return True
 
     def can_stop(self) -> bool:
         # 如果所有任务均运行完成即可退出
         for _tasks in self.task_list:
-            if not _tasks.end_run:
+            if _tasks.status != task_status.END:
                 return False
         return True
 

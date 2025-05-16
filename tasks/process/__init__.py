@@ -12,7 +12,7 @@ class process(task):
         self.connect = _duckdb.cursor()
         self.mongo = _mongo
 
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.connect.close()
 
     def update_time(self, name: str, session=None):

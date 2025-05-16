@@ -8,7 +8,7 @@ class wire_number_process(process):
         super().__init__(connect.duckdb, connect.mongo, "线号标签申请数据处理", "wire_number_process")
         self.path = "\\\\172.18.1.60\\部室文件(新)\\总成车间（新）\\4.工位工作\\线号标签申请\\"
         
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         columns=[
             "4.8黄 上标",
             "4.8黄 下标",

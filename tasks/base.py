@@ -6,19 +6,26 @@ import pandas as pd
 from dataclasses import dataclass
 from sqlalchemy import text
 from abc import ABC, abstractmethod
+from enum import Enum
 
 from utils.config import CONFIG
 from utils.connect import connect_data
 from utils.logger import make_logger
 
 
+class task_status(Enum):
+    '''任务的当前状态，也就是任务的生命周期'''
+    WAIT = 1
+    RUNNING = 2
+    END = 3
+    DEAD = 4
+
 class task(ABC):
     '''所有任务的抽象'''
 
     def __init__(self, _duckdb: duckdb.DuckDBPyConnection, name: str, logger_name: str) -> None:
         self.name = name
-        self.start_run = False
-        self.end_run = False
+        self.status: task_status = task_status.WAIT
         self.log = make_logger(_duckdb, name, logger_name)
         self.depend: list[str] = []
 
@@ -29,23 +36,33 @@ class task(ABC):
         return self
 
     @abstractmethod
-    def task_main(self) -> None:
+    def task_run(self) -> None:
+        # 继承后实现逻辑的地方
+        ...
+        
+    @abstractmethod
+    def task_delete(self) -> None:
         # 继承后实现逻辑的地方
         ...
 
     def run(self) -> None:
         # 真正运行函数的地方
-        if not self.start_run and not self.end_run:
-            self.start_run = True
+        if self.status == task_status.WAIT:
+            self.status = task_status.RUNNING
             start_time = time.time()
             try:
-                self.task_main()
+                self.task_run()
             except Exception as e:
                 self.log.critical("报错内容：" + str(e))
                 self.log.critical("报错堆栈信息：" + str(traceback.format_exc()))
             end_time = time.time()
-            self.end_run = True
+            self.status = task_status.END
             self.log.info("函数花费时间为:{} 秒,".format(end_time - start_time) + f"{self.name} 任务已完成")
+            
+    def __del__(self) -> None:
+        if self.status == task_status.END:
+            self.status = task_status.DEAD
+            self.task_delete()
 
 
 @dataclass
@@ -66,12 +83,12 @@ class load(task):
         self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp_df: pd.DataFrame = self.source.sql(self.data.source_sql).fetchdf()
         temp_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="replace")
         self.log.debug(f"全量抽取已完成")
 
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.source.close()
         self.target.close()
 
@@ -93,12 +110,12 @@ class extract(task):
         self.target = connect.duckdb.cursor()
         self.log.info(f"任务{self.data.name}初始化完成")
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp_df = pd.read_sql(self.data.source_sql, self.source)
         self.target.execute(f"CREATE OR REPLACE TABLE ods.{self.data.target_table} AS SELECT * FROM temp_df")
         self.log.debug(f"全量抽取已完成")
 
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.source.close()
         self.target.close()
 
@@ -122,12 +139,12 @@ class sync(task):
         self.target = connect.connect[data.target]
         self.log.info(f"任务{self.data.name}初始化完成")
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp_df = pd.read_sql(self.data.source_sql, self.source)
         index = temp_df.to_sql(name=self.data.taget_table, con=self.target, schema=self.data.target_db, if_exists="replace")
         self.log.debug(f"全量同步已完成，变更{str(index)}行")
 
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.source.close()
         self.target.close()
 
@@ -325,7 +342,7 @@ class load_increase(task):
             # 因为前文已经检查过目标表的结构了，一般情况下可以成功插入
             increase_df.to_sql(name=self.data.target_table, con=self.target, schema=self.data.target_db, if_exists="append")
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp = self.source.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
         if len(temp) == 0:
             self.log.warning("本地未找到目标表的元数据缓存，转换为全量同步")
@@ -354,7 +371,7 @@ class load_increase(task):
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
     
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.source.close()
         self.target.close()
 
@@ -413,7 +430,7 @@ class extract_increase(task):
                 self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
                 return self.trans_sync()
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp = self.target.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'ods' AND table_name = '{self.data.target_table}'").fetchall()
         if len(temp) == 0:
             self.log.warning("本地未找到目标表，转换为全量同步")
@@ -435,7 +452,7 @@ class extract_increase(task):
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
         
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.source.close()
         self.target.close()
 
@@ -498,7 +515,7 @@ class sync_increase(task):
                 self.log.warning("插入数据失败，疑似为表结构变更，转换为全量同步")
                 return self.trans_sync()
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         temp = self.local.sql(f"SELECT 1 FROM information_schema.tables WHERE table_schema = 'meta' AND table_name = '{self.data.target_db}_{self.data.target_table}'").fetchall()
         if len(temp) == 0:
             self.log.warning("本地未找到目标表的元数据缓存，转换为全量同步")
@@ -525,7 +542,7 @@ class sync_increase(task):
         self.task_append(new_diff + change_diff)
         self.log.debug("已成功完成该主表的增量同步")
 
-    def __del__(self) -> None:
+    def task_delete(self) -> None:
         self.local.close()
         self.source.close()
         self.target.close()

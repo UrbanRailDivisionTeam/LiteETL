@@ -8,7 +8,7 @@ class ameliorate_process(process):
     def __init__(self, connect: connect_data) -> None:
         super().__init__(connect.duckdb, connect.mongo, "全员型改善数据分析", "ameliorate_process")
 
-    def task_main(self) -> None:
+    def task_run(self) -> None:
         data_index = pd.read_csv(os.path.join(CONFIG.TABLE_PATH, "城轨事业部改善指标.csv"), encoding="utf-8")
         bill: pd.DataFrame = self.connect.sql(
             f"""
