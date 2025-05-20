@@ -30,7 +30,7 @@ def make_json_head(
             SELECT 
                 SUM(epoch(bill."{use_time_name}") / 60) / COUNT(bill."单据编码")
             FROM dwd.ontime_final_result bill
-            WHERE NOT bill."{use_time_name}" IS NULL
+            WHERE NOT bill."{use_time_name}" IS NULL AND bill.{start_time_name} >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)  
         """
     ).fetchall()[0][0]
     request_value = int(request_time[request_time_name].total_seconds() / 60)

@@ -138,8 +138,8 @@ def process(
                     bill."单据编码",
                     MAX(op_0."修改日期") AS "实际一次诊断时间",
                     MAX(op_1."修改日期") AS "实际二次诊断时间",
-                    MAX(op_1."修改日期") AS "实际返工时间",
-                    MAX(op_1."修改日期") AS "实际验收时间",
+                    MAX(op_2."修改日期") AS "实际返工时间",
+                    MAX(op_3."修改日期") AS "实际验收时间",
                 FROM flow_object bill
             LEFT JOIN ods.af_operation_log op_0 ON 
                 bill."流程实例ID" = op_0."流程实例ID" 

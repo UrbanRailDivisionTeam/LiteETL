@@ -3,7 +3,6 @@ from utils.connect import make_coonect
 from tasks.executer import executer
 from tasks.init import task_init
 
-
 if __name__ == "__main__":
     while True:
         try:
