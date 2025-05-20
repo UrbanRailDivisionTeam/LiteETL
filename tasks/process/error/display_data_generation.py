@@ -9,7 +9,8 @@ def make_json_head(
     request_time: dict[str, datetime.timedelta],
     head_map: dict[str, int],
     title_name: str,
-    real_time_name: str,
+    status_colnums: str,
+    status: str,
     start_time_name: str,
     use_time_name: str,
     request_time_name: str
@@ -22,7 +23,7 @@ def make_json_head(
             SELECT 
                 COUNT(bill."单据编码")
             FROM dwd.ontime_final_result bill
-            WHERE bill."{real_time_name}" IS NULL AND NOT bill."{start_time_name}" IS NULL
+            WHERE bill."{status_colnums}" == '{status}'
         """
     ).fetchall()[0][0]
     average_value = connect.sql(
@@ -181,11 +182,11 @@ def process(
     on_time_norms: float
 ) -> dict[str, list[dict[str, Any]]]:
     calibration_line_total_data = [
-        make_json_head(connect, request_time, head_map, "未响应异常数", "实际响应时间", "响应计算起始时间", "响应用时", "响应"),
-        make_json_head(connect, request_time, head_map, "一次诊断进行中流程数", "实际一次诊断时间", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
-        make_json_head(connect, request_time, head_map, "二次诊断进行中流程数", "实际二次诊断时间", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
-        make_json_head(connect, request_time, head_map, "返工进行中流程数", "实际返工时间", "返工计算起始时间", "返工用时", "返工"),
-        make_json_head(connect, request_time, head_map, "验收进行中流程数", "实际验收时间", "验收计算起始时间", "验收用时", "验收"),
+        make_json_head(connect, request_time, head_map, "未响应异常数", "发起单单据状态", "待响应", "响应计算起始时间", "响应用时", "响应"),
+        make_json_head(connect, request_time, head_map, "一次诊断进行中流程数", "处理单单据状态", "处理中", "一次诊断计算起始时间", "一次诊断用时", "一次诊断"),
+        make_json_head(connect, request_time, head_map, "二次诊断进行中流程数", "处理单单据状态", "诊断中", "二次诊断计算起始时间", "二次诊断用时", "二次诊断"),
+        make_json_head(connect, request_time, head_map, "返工进行中流程数", "处理单单据状态", "整改中", "返工计算起始时间", "返工用时", "返工"),
+        make_json_head(connect, request_time, head_map, "验收进行中流程数", "处理单单据状态", "验收中", "验收计算起始时间", "验收用时", "验收"),
     ]
     # 中间几个用于显示占比的卡片
     pie_chart_no_error_data = [

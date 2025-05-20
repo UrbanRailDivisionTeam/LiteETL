@@ -83,11 +83,11 @@ def process(
                     ORDER BY bill."单据编码"
                 )
             SELECT 
-                bill."单据编码",
+                afhf."单据编号" AS "单据编码",
                 bill."响应计算起始时间",
                 afhf."响应时间" AS "实际响应时间"
-            FROM flow_operation bill
-            LEFT JOIN ods.alignment_error_handle afhf ON afhf."单据编号" = bill."单据编码"
+            FROM ods.alignment_error_handle afhf 
+            LEFT JOIN flow_operation bill ON afhf."单据编号" = bill."单据编码"
         '''
     ).fetchdf()
 
@@ -133,43 +133,42 @@ def process(
                         bill."单据类型" = '{specialization_name['处理单单据名称']}' 
                         AND t_bill."流程标识" = '{specialization_name['处理单流程名称']}'
                 ),
-            flow_operation AS (
-                SELECT 
-                    bill."单据编码",
-                    MAX(op_0."修改日期") AS "实际一次诊断时间",
-                    MAX(op_1."修改日期") AS "实际二次诊断时间",
-                    MAX(op_2."修改日期") AS "实际返工时间",
-                    MAX(op_3."修改日期") AS "实际验收时间",
-                FROM flow_object bill
-            LEFT JOIN ods.af_operation_log op_0 ON 
-                bill."流程实例ID" = op_0."流程实例ID" 
-                AND op_0."活动实例名称" = '校线异常处理提交'
-                AND op_0."结果编码" = 'submit'
-            LEFT JOIN ods.af_operation_log op_1 ON 
-                bill."流程实例ID" = op_1."流程实例ID" 
-                AND op_1."活动实例名称" = '指定诊断人'
-                AND op_1."结果编码" = 'Consent'
-            LEFT JOIN ods.af_operation_log op_2 ON 
-                bill."流程实例ID" = op_2."流程实例ID" 
-                AND op_2."活动实例名称" = '返工执行人'
-                AND op_2."结果编码" = 'Consent'
-            LEFT JOIN ods.af_operation_log op_3 ON 
-                bill."流程实例ID" = op_3."流程实例ID" 
-                AND op_3."活动实例名称" = '提报人'
-                AND op_3."结果编码" = 'Consent'
-                GROUP BY bill."单据编码"
-                ORDER BY bill."单据编码"
-            )
+                flow_operation AS (
+                    SELECT 
+                        bill."单据编码",
+                        MAX(op_0."修改日期") AS "实际一次诊断时间",
+                        MAX(op_1."修改日期") AS "实际二次诊断时间",
+                        MAX(op_2."修改日期") AS "实际返工时间",
+                        MAX(op_3."修改日期") AS "实际验收时间",
+                    FROM flow_object bill
+                LEFT JOIN ods.af_operation_log op_0 ON 
+                    bill."流程实例ID" = op_0."流程实例ID" 
+                    AND op_0."活动实例名称" = '校线异常处理提交'
+                    AND op_0."结果编码" = 'submit'
+                LEFT JOIN ods.af_operation_log op_1 ON 
+                    bill."流程实例ID" = op_1."流程实例ID" 
+                    AND op_1."活动实例名称" = '指定诊断人'
+                    AND op_1."结果编码" = 'Consent'
+                LEFT JOIN ods.af_operation_log op_2 ON 
+                    bill."流程实例ID" = op_2."流程实例ID" 
+                    AND op_2."活动实例名称" = '返工执行人'
+                    AND op_2."结果编码" = 'Consent'
+                LEFT JOIN ods.af_operation_log op_3 ON 
+                    bill."流程实例ID" = op_3."流程实例ID" 
+                    AND op_3."活动实例名称" = '提报人'
+                    AND op_3."结果编码" = 'Consent'
+                    GROUP BY bill."单据编码"
+                    ORDER BY bill."单据编码"
+                )
             SELECT
                 alei."单据编号" AS "单据编码",
                 alei."响应时间" AS "一次诊断计算起始时间",
                 bill."实际一次诊断时间",
                 bill."实际二次诊断时间",
                 bill."实际返工时间",
-                bill."实际验收时间",
+                bill."实际验收时间"
             FROM ods.alignment_error_initiate alei 
             LEFT JOIN flow_operation bill ON alei."单据编号" = bill."单据编码"
-            WHERE NOT bill."单据编码" IS NULL
         """
     ).fetchdf()
 
@@ -282,6 +281,8 @@ def process(
             CREATE OR REPLACE TABLE dwd.ontime_final_result AS 
                 SELECT 
                     f0."单据编码",
+                    f7."单据状态" as "发起单单据状态",
+                    f8."单据状态" as "处理单单据状态",
                     f3."责任单位",
                     f4."构型分类",
                     f5."项目名称",
@@ -329,5 +330,7 @@ def process(
                 LEFT JOIN flow_operation_configuration f4 ON f0."单据编码" = f4."单据编号"
                 LEFT JOIN flow_operation_project f5 ON f0."单据编码" = f5."单据编号"
                 LEFT JOIN flow_operation_reason f6 ON f0."单据编码" = f6."单据编号"
+                LEFT JOIN ods.alignment_error_handle f7 ON f0."单据编码" = f7."单据编号"
+                LEFT JOIN ods.alignment_error_initiate f8 ON f0."单据编码" = f8."单据编号"
         """
     )

@@ -52,6 +52,8 @@ select
         when 'C' then '验收合格'
         when 'D' then '整改中'
         when 'F' then '验收中'
+        when 'G' then '缺失未完'
+        when 'H' then '完工'
         else bill.fbillstatus
     END AS "单据状态"
 FROM
