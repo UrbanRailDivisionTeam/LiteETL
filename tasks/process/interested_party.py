@@ -69,7 +69,7 @@ class interested_party_process(process):
                     bill."公司名称"
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-                    AND bull."单据状态" <> "暂存"
+                    AND bill."单据状态" <> '暂存'
             """
         ).fetchdf()
         location_name: pd.DataFrame = self.connect.sql(
@@ -79,7 +79,7 @@ class interested_party_process(process):
                     bill."作业地点"
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-                    AND bull."单据状态" <> "暂存"
+                    AND bill."单据状态" <> '暂存'
             """
         ).fetchdf()
         interested_party_name_list: list[str] = interested_party_name["公司名称"].to_list()
@@ -99,7 +99,7 @@ class interested_party_process(process):
                     COUNT(bill."id") as "计数"
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-                    AND bull."单据状态" <> "暂存"
+                    AND bill."单据状态" <> '暂存'
                 GROUP BY bill."作业地点", bill."公司名称"
             """
         ).fetchdf()
@@ -119,7 +119,7 @@ class interested_party_process(process):
                     COUNT(bill."id") as _count
                 FROM ods.interested_party_review bill
                 WHERE bill."单据状态" = '已审核'
-                    AND bill."作业状态" IN ("已进入事业部", "正在作业", "临时外出", "作业完成")
+                    AND bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成')
             """
         ).fetchall()[0][0])
         self.interested_party_head_card_data_config[1]["value"] = int(self.connect.sql(
@@ -128,8 +128,8 @@ class interested_party_process(process):
                     COUNT(bill."id") as _count
                 FROM ods.interested_party_review bill
                 WHERE bill."单据状态" = '已审核'
-                    AND bill."作业状态" IN ("已进入事业部", "正在作业", "临时外出", "作业完成")
-                    AND bill."作业地点" <> "库外"
+                    AND bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成')
+                    AND bill."作业地点" <> '库外'
             """
         ).fetchall()[0][0])
         self.interested_party_head_card_data_config[2]["value"] = int(self.connect.sql(
@@ -138,7 +138,7 @@ class interested_party_process(process):
                     COUNT(bill."id") as _count
                 FROM ods.interested_party_review bill
                 WHERE bill."单据状态" = '已审核'
-                    AND bill."作业状态" = "临时外出"
+                    AND bill."作业状态" = '临时外出'
             """
         ).fetchall()[0][0])
         return self.interested_party_head_card_data_config
@@ -148,16 +148,22 @@ class interested_party_process(process):
         temp_data: pd.DataFrame = self.connect.sql(
             f"""
                 SELECT
-                    TO_CHAR(bill."计划开工日期", 'YYYY-MM') AS month,
+                    strftime(bill."计划开工日期", '%Y-%m') AS _month,
                     COUNT(bill."id") AS _count
                 FROM ods.interested_party_review bill
                 WHERE bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成', '已离开事业部')
                     AND bill."计划开工日期" >= DATE_TRUNC('year', CURRENT_DATE)::TIMESTAMP_NS
-                GROUP BY TO_CHAR(bill."计划开工日期", 'YYYY-MM')
-                ORDER BY month
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m')
+                ORDER BY _month
             """
         ).fetchdf()
-        temp_list = temp_data["_count"].to_list()
+        temp_month_list = [f"{str(datetime.datetime.now().year)}-{str(num).zfill(2)}" for num in range(1, 13)]
+        temp_list = [0 for _ in range(1, 13)]
+        for _, row in temp_data.iterrows():
+            for index, ch in enumerate(temp_month_list):
+                if row["_month"] == ch:
+                    temp_list[index] = int(row["_count"])
+                    break
         self.interested_party_datatime_dat_congif[0]["series"] = temp_list
         self.interested_party_datatime_dat_congif[0]["key"] = temp_list[month]
         if month > 0:
@@ -266,7 +272,7 @@ class interested_party_process(process):
                     COUNT(bill."id") AS _count
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-                    AND bull."单据状态" <> "暂存"
+                    AND bill."单据状态" <> '暂存'
                 GROUP BY bill."作业类型", bill."具体作业内容"
             """
         ).fetchdf()
@@ -289,7 +295,7 @@ class interested_party_process(process):
                     COUNT(bill."id") AS _count
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
-                    AND bull."单据状态" <> "暂存"
+                    AND bill."单据状态" <> '暂存'
                 GROUP BY bill."项目名称", bill."车号"
             """
         ).fetchdf()
@@ -359,7 +365,7 @@ class interested_party_process(process):
                     bill."作业类型",
                     bill."具体作业内容"
                 FROM ods.interested_party_review bill
-                WHERE bill."作业状态" IN ("已进入事业部", "正在作业", "临时外出", "作业完成")
+                WHERE bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成')
             """
         ).fetchdf()
         return json.loads(data.to_json(orient='records'))

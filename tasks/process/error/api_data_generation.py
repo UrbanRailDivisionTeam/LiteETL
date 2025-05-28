@@ -202,7 +202,7 @@ class api_data_generation:
             for _, row in data.iterrows():
                 temp_trend += row["ontime"] / row["total"] if row["total"] != 0 else 0
                 group_data.append({
-                    "name": row["group_name"],
+                    "name": row["name"],
                     "ontime": row["ontime"],
                     "total": row["total"],
                 })
@@ -251,6 +251,7 @@ class api_data_generation:
                     COUNT(bill."单据编码") AS "value"
                 FROM dwd.ontime_final_result bill
                 WHERE NOT bill."失效原因_一级" IS NULL
+                    AND NOT TRIM(bill."失效原因_一级") = ''
                     AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
                 GROUP BY bill."失效原因_一级", bill."失效原因_二级"
             """
