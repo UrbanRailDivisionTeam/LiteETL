@@ -265,7 +265,6 @@ class api_data_generation:
                 node = node[ch]
             node["value"] = row["value"]
         # 递归处理结构使其符合api
-
         def recursion(input_dict: dict):
             tree_list = []
             for key, value in input_dict.items():

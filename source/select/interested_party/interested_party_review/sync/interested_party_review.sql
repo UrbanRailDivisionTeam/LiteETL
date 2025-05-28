@@ -1,5 +1,6 @@
 SELECT
     bill.Fid AS "id",
+    bill.fcreatetime as "创建时间",
     bill.fmodifytime as "修改时间",
     bill.fk_crrc_textfield AS "申请人姓名",
     bill.fk_crrc_textfield1 AS "申请人身份证号",
