@@ -12,6 +12,9 @@ class api_data_generation:
         self.mongodb_connect = mongodb_connect
         self.request_time = request_time
         self.on_time_norms = 0.8
+        self.filter_config = [
+            ""
+        ]
         self.calibration_line_total_data_config = [
             {
                 "index": 0,
@@ -224,6 +227,7 @@ class api_data_generation:
                         COUNT(bill."单据编码") AS "value",
                     FROM dwd.ontime_final_result bill
                     WHERE NOT bill."{ch["colunms_name"]}" IS NULL 
+                        AND NOT TRIM(bill."{ch["colunms_name"]}") = '' 
                         AND bill."响应计算起始时间" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)  
                     GROUP BY bill."{ch["colunms_name"]}"
                 """
@@ -274,7 +278,7 @@ class api_data_generation:
                     if 'value' in value:
                         tree['value'] = value['value']
                     else:
-                        tree['children'] = [recursion(value)]
+                        tree['children'] = recursion(value)
                 tree_list.append(tree)
             return tree_list
         return recursion(node_list)

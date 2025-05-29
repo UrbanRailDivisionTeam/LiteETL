@@ -5,6 +5,36 @@ from typing import Any
 from tasks.process import process
 from utils.connect import connect_data
 
+def get_last_12_months():
+    """
+    获取最近12个月的年月名称列表
+    """
+    today = datetime.datetime.now()
+    months = []
+    current_year = today.year
+    current_month = today.month
+    for _ in range(12):
+        formatted_date = f"{current_year}-{current_month:02d}"
+        months.append(formatted_date)
+        if current_month == 1:
+            current_month = 12
+            current_year -= 1
+        else:
+            current_month -= 1
+    return months[::-1]
+
+def get_last_30_days():
+    """
+    获取最近30天的日期列表
+    """
+    today = datetime.datetime.now()
+    dates = []
+    for i in range(30):
+        target_date = today - datetime.timedelta(days=i)
+        formatted_date = target_date.strftime('%Y-%m-%d')
+        dates.append(formatted_date)
+    return dates[::-1]
+
 
 class interested_party_process(process):
     def __init__(self, connect: connect_data) -> None:
@@ -45,19 +75,19 @@ class interested_party_process(process):
                 "data": []
             }
         ]
-        self.interested_party_datatime_dat_congif = [
+        self.interested_party_datatime_dat_config = [
             {
                 "key": 0,
                 "trend": True,
                 "label": "+0%",
-                "series": [],
+                "series": [[], [], []],
 
             },
             {
                 "key": 0,
                 "trend": True,
                 "label": "+0%",
-                "series": []
+                "series": [[], [], []],
             }
         ]
 
@@ -144,39 +174,150 @@ class interested_party_process(process):
         return self.interested_party_head_card_data_config
 
     def interested_party_datatime_data(self):
-        month = datetime.datetime.now().month - 1
-        temp_data: pd.DataFrame = self.connect.sql(
+        # 月份
+        temp_month_list = get_last_12_months()
+        temp_enter_value = [0 for _ in range(12)]
+        temp_goout_value = [0 for _ in range(12)]
+        temp_leave_value = [0 for _ in range(12)]
+        temp_enter: pd.DataFrame = self.connect.sql(
             f"""
                 SELECT
                     strftime(bill."计划开工日期", '%Y-%m') AS _month,
                     COUNT(bill."id") AS _count
                 FROM ods.interested_party_review bill
-                WHERE bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成', '已离开事业部')
-                    AND bill."计划开工日期" >= DATE_TRUNC('year', CURRENT_DATE)::TIMESTAMP_NS
+                WHERE bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成')
                 GROUP BY strftime(bill."计划开工日期", '%Y-%m')
                 ORDER BY _month
             """
         ).fetchdf()
-        temp_month_list = [f"{str(datetime.datetime.now().year)}-{str(num).zfill(2)}" for num in range(1, 13)]
-        temp_list = [0 for _ in range(1, 13)]
-        for _, row in temp_data.iterrows():
+        temp_goout: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    strftime(bill."计划开工日期", '%Y-%m') AS _month,
+                    COUNT(bill."id") AS _count
+                FROM ods.interested_party_review bill
+                WHERE bill."作业状态" = '临时外出'
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m')
+                ORDER BY _month
+            """
+        ).fetchdf()
+        temp_leave: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    strftime(bill."计划开工日期", '%Y-%m') AS _month,
+                    COUNT(bill."id") AS _count
+                FROM ods.interested_party_review bill
+                WHERE bill."作业状态" = '已离开事业部'
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m')
+                ORDER BY _month
+            """
+        ).fetchdf()
+        for _, row in temp_enter.iterrows():
             for index, ch in enumerate(temp_month_list):
                 if row["_month"] == ch:
-                    temp_list[index] = int(row["_count"])
+                    temp_enter_value[index] = int(row["_count"])
                     break
-        self.interested_party_datatime_dat_congif[0]["series"] = temp_list
-        self.interested_party_datatime_dat_congif[0]["key"] = temp_list[month]
-        if month > 0:
-            if temp_list[month] > temp_list[month-1]:
-                self.interested_party_datatime_dat_congif[0]["trend"] = True
-                self.interested_party_datatime_dat_congif[0]["label"] = "+" + str(int(int(temp_list[month]) / int(temp_list[month-1]) - 1)) + "%" if int(temp_list[month-1]) != 0 else 0
-            else:
-                self.interested_party_datatime_dat_congif[0]["trend"] = False
-                self.interested_party_datatime_dat_congif[0]["label"] = "-" + str(int(int(temp_list[month-1]) / int(temp_list[month]) - 1)) + "%" if int(temp_list[month]) != 0 else 0
+        for _, row in temp_goout.iterrows():
+            for index, ch in enumerate(temp_month_list):
+                if row["_month"] == ch:
+                    temp_goout_value[index] = int(row["_count"])
+                    break
+        for _, row in temp_leave.iterrows():
+            for index, ch in enumerate(temp_month_list):
+                if row["_month"] == ch:
+                    temp_leave_value[index] = int(row["_count"])
+                    break
+        self.interested_party_datatime_dat_config[0]["series"][0] = temp_enter_value
+        self.interested_party_datatime_dat_config[0]["series"][1] = temp_goout_value
+        self.interested_party_datatime_dat_config[0]["series"][2] = temp_leave_value
+        self.interested_party_datatime_dat_config[0]["key"] = temp_enter_value[-1]
+        self.interested_party_datatime_dat_config[0]["trend"] = True
+        self.interested_party_datatime_dat_config[0]["label"] = "+0%"
+        if temp_enter_value[-1] >= temp_enter_value[-2]:
+            self.interested_party_datatime_dat_config[0]["trend"] = True
+            if int(temp_enter_value[-2]) != 0:
+                self.interested_party_datatime_dat_config[0]["label"] = "+" + str(int(int(temp_enter_value[-1]) / int(temp_enter_value[-2]) - 1)) + "%"
+            elif int(temp_enter_value[-2]) == 0 and int(temp_enter_value[-1]) != 0 :
+                self.interested_party_datatime_dat_config[0]["label"] = "+∞%"
         else:
-            self.interested_party_datatime_dat_congif[0]["trend"] = True
-            self.interested_party_datatime_dat_congif[0]["label"] = "+0%"
-        return self.interested_party_datatime_dat_congif
+            self.interested_party_datatime_dat_config[0]["trend"] = False
+            if int(temp_enter_value[-1]) != 0:
+                self.interested_party_datatime_dat_config[0]["label"] = "-" + str(int(int(temp_enter_value[-2]) / int(temp_enter_value[-1]) - 1)) + "%"
+            elif int(temp_enter_value[-1]) == 0 and int(temp_enter_value[-2]) != 0:
+                self.interested_party_datatime_dat_config[0]["label"] = "-∞%"
+        # 日期
+        temp_day_list = get_last_30_days()
+        temp_enter_value = [0 for _ in range(30)]
+        temp_goout_value = [0 for _ in range(30)]
+        temp_leave_value = [0 for _ in range(30)]
+        temp_enter: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    strftime(bill."计划开工日期", '%Y-%m-%d') AS _day,
+                    COUNT(bill."id") AS _count
+                FROM ods.interested_party_review bill
+                WHERE bill."作业状态" IN ('已进入事业部', '正在作业', '临时外出', '作业完成')
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m-%d')
+                ORDER BY _day
+            """
+        ).fetchdf()
+        temp_goout: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    strftime(bill."计划开工日期", '%Y-%m-%d') AS _day,
+                    COUNT(bill."id") AS _count
+                FROM ods.interested_party_review bill
+                WHERE bill."作业状态" = '临时外出'
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m-%d')
+                ORDER BY _day
+            """
+        ).fetchdf()
+        temp_leave: pd.DataFrame = self.connect.sql(
+            f"""
+                SELECT
+                    strftime(bill."计划开工日期", '%Y-%m-%d') AS _day,
+                    COUNT(bill."id") AS _count
+                FROM ods.interested_party_review bill
+                WHERE bill."作业状态" = '已离开事业部'
+                GROUP BY strftime(bill."计划开工日期", '%Y-%m-%d')
+                ORDER BY _day
+            """
+        ).fetchdf()
+        for _, row in temp_enter.iterrows():
+            for index, ch in enumerate(temp_day_list):
+                if row["_day"] == ch:
+                    temp_enter_value[index] = int(row["_count"])
+                    break
+        for _, row in temp_goout.iterrows():
+            for index, ch in enumerate(temp_day_list):
+                if row["_day"] == ch:
+                    temp_goout_value[index] = int(row["_count"])
+                    break
+        for _, row in temp_leave.iterrows():
+            for index, ch in enumerate(temp_day_list):
+                if row["_day"] == ch:
+                    temp_leave_value[index] = int(row["_count"])
+                    break
+        self.interested_party_datatime_dat_config[1]["series"][0] = temp_enter_value
+        self.interested_party_datatime_dat_config[1]["series"][1] = temp_goout_value
+        self.interested_party_datatime_dat_config[1]["series"][2] = temp_leave_value
+        self.interested_party_datatime_dat_config[1]["key"] = temp_enter_value[-1]
+        self.interested_party_datatime_dat_config[1]["trend"] = True
+        self.interested_party_datatime_dat_config[1]["label"] = "+0%"
+        if temp_enter_value[-1] >= temp_enter_value[-2]:
+            self.interested_party_datatime_dat_config[1]["trend"] = True
+            if int(temp_enter_value[-2]) != 0:
+                self.interested_party_datatime_dat_config[1]["label"] = "+" + str(int(int(temp_enter_value[-1]) / int(temp_enter_value[-2]) - 1)) + "%"
+            elif int(temp_enter_value[-2]) == 0 and int(temp_enter_value[-1]) != 0 :
+                self.interested_party_datatime_dat_config[1]["label"] = "+∞%"
+        else:
+            self.interested_party_datatime_dat_config[1]["trend"] = False
+            if int(temp_enter_value[-1]) != 0:
+                self.interested_party_datatime_dat_config[1]["label"] = "-" + str(int(int(temp_enter_value[-2]) / int(temp_enter_value[-1]) - 1)) + "%"
+            elif int(temp_enter_value[-1]) == 0 and int(temp_enter_value[-2]) != 0:
+                self.interested_party_datatime_dat_config[1]["label"] = "-∞%"
+                
+        return self.interested_party_datatime_dat_config
 
     def interested_party_center_data(self):
         dangerous_dataframe: pd.DataFrame = self.connect.sql(
@@ -232,7 +373,9 @@ class interested_party_process(process):
                     bill."作业依据",
                     COUNT(bill."id") as "计数"
                 FROM ods.interested_party_review bill
-                WHERE bill."作业依据" IS NOT NULL AND bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
+                WHERE bill."作业依据" IS NOT NULL 
+                    AND NOT TRIM(bill."作业依据") = ''
+                    AND bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
                 GROUP BY bill."作业依据"
             """
         ).fetchdf()
@@ -273,6 +416,10 @@ class interested_party_process(process):
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
                     AND bill."单据状态" <> '暂存'
+                    AND NOT bill."作业类型" IS NULL 
+                    AND NOT bill."具体作业内容" IS NULL 
+                    AND NOT TRIM(bill."具体作业内容") = ''
+                    AND NOT TRIM(bill."具体作业内容") = ''
                 GROUP BY bill."作业类型", bill."具体作业内容"
             """
         ).fetchdf()
@@ -296,6 +443,8 @@ class interested_party_process(process):
                 FROM ods.interested_party_review bill
                 WHERE bill."计划开工日期" >= (DATE_TRUNC('month', CURRENT_DATE)::TIMESTAMP_NS)
                     AND bill."单据状态" <> '暂存'
+                    AND NOT bill."项目名称" IS NULL 
+                    AND NOT TRIM(bill."项目名称") = ''
                 GROUP BY bill."项目名称", bill."车号"
             """
         ).fetchdf()
@@ -418,6 +567,6 @@ class interested_party_process(process):
                 if 'value' in value:
                     tree['value'] = value['value']
                 else:
-                    tree['children'] = [self.recursion(value)]
+                    tree['children'] = self.recursion(value)
             tree_list.append(tree)
         return tree_list
